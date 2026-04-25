@@ -1,0 +1,16 @@
+{
+  "name": "ai-safe-link-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension scaffold for AI Safe Link Sandbox.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "dev": "npm run watch"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.280",
+    "typescript": "^5.6.3"
+  }
+}
