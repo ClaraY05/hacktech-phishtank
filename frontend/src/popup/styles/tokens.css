@@ -1,0 +1,17 @@
+:root {
+  --yellow: #f5b301;
+  --yellow-light: rgba(245, 179, 1, 0.12);
+  --yellow-border: rgba(245, 179, 1, 0.35);
+  --teal: #0a8c7a;
+  --teal-light: rgba(10, 140, 122, 0.1);
+  --teal-border: rgba(10, 140, 122, 0.24);
+  --coral: #e8472f;
+  --coral-light: rgba(232, 71, 47, 0.08);
+  --coral-border: rgba(232, 71, 47, 0.2);
+  --bg: #f7f7f5;
+  --paper: rgba(255, 255, 255, 0.8);
+  --ink: #111110;
+  --muted: #6b6760;
+  --faint: #9e9a94;
+  --border: rgba(0, 0, 0, 0.08);
+}
