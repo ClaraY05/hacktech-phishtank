@@ -7,7 +7,8 @@ name = "ai-safe-link-backend"
 version = "0.1.0"
 description = "Backend scaffold for AI Safe Link Sandbox orchestration."
 readme = "README.md"
-requires-python = ">=3.11"
+# FIX 1: Lowered to 3.10 to match Microsoft's Playwright Docker image
+requires-python = ">=3.10" 
 dependencies = [
   "fastapi>=0.115.0",
   "uvicorn[standard]>=0.30.0",
@@ -21,5 +22,9 @@ dev = [
   "ruff>=0.6.0",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+# FIX 2: Map the package name directly to your flat 'src' folder
+[tool.setuptools]
+packages = ["ai_safe_link_backend"]
+
+[tool.setuptools.package-dir]
+"ai_safe_link_backend" = "src"

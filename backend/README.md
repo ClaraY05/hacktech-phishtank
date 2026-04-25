@@ -26,6 +26,9 @@ This service is intended to:
 4. Run ./setup.sh (`chmod +x ./setup` if needed)
 
 ## Run (placeholder app)
+```bash
+podman build -t safe-link-worker .
+```
 
 ```bash
 uvicorn main:app --reload --app-dir src
