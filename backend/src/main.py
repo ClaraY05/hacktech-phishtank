@@ -38,11 +38,13 @@ def health() -> dict[str, str]:
 
 @app.post("/analyze-links")
 def analyze_links(payload: AnalyzeLinksRequest) -> dict:
-    # logger.info("Received page_url=%s  link_count=%d", payload.page_url, len(payload.links))
-    # logger.info("  dom_signals=%s  html_chars=%d  content_hash_hint=%s",
-    #             payload.dom_signals, len(payload.sanitized_html_excerpt or ""), payload.content_hash_hint)
-    # for link in payload.links:
-    #     logger.info("  url=%s  text=%r", link.url, link.text)
+    # logger.info("=== /analyze-links received ===")
+    # logger.info("  page_url=%s", payload.page_url)
+    # logger.info("  link_count=%d  unique=%d", len(payload.links), len(set(str(l.url) for l in payload.links)))
+    # logger.info("  dom_signals=%s", payload.dom_signals)
+    # logger.info("  html_chars=%d  content_hash_hint=%s", len(payload.sanitized_html_excerpt or ""), payload.content_hash_hint)
+    # for i, link in enumerate(payload.links):
+    #     logger.info("  [%d] url=%s  text=%r", i, link.url, link.text)
 
     unique_urls = list(dict.fromkeys(str(link.url) for link in payload.links))
     dom_signals = payload.dom_signals or {}
