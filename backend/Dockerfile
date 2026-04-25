@@ -31,5 +31,5 @@ RUN chown -R pwuser:pwuser /home/pwuser/app
 USER pwuser
 
 # 10. The default command when the container spins up
-# This assumes your worker.py is set up to be run as a module
-ENTRYPOINT ["python", "src/worker.py"]
+# This assumes your sandbox.py is set up to be run as a module
+ENTRYPOINT ["python", "src/sandbox.py"]

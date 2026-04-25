@@ -27,7 +27,7 @@ This service is intended to:
 
 ## Run (placeholder app)
 ```bash
-podman build -t safe-link-worker .
+docker build -t safe-link-worker .
 ```
 
 ```bash

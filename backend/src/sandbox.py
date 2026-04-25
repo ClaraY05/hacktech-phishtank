@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+import json
 import asyncio
 import base64
 from urllib.parse import urlparse
@@ -198,3 +200,22 @@ async def analyze_batch(urls: list[str]) -> list[SandboxResult]:
             return await analyze_url(url)
 
     return await asyncio.gather(*[bounded(url) for url in urls])
+
+if __name__ == "__main__":
+    # Ensure FastAPI actually passed a URL when it started the container
+    if len(sys.argv) < 2:
+        error_report = {"status": "error", "error": "No URL provided to worker"}
+        print(json.dumps(error_report))
+        sys.exit(1)
+        
+    # sys.argv[1] is the URL passed by the podman run command
+    target_url = sys.argv[1]
+    
+    try:
+        # Because analyze_url is an async function, we must use asyncio.run()
+        result = asyncio.run(analyze_url(target_url))
+        print(json.dumps(result))
+    except Exception as e:
+        error_report = {"status": "error", "error": str(e)}
+        print(json.dumps(error_report))
+        sys.exit(1)

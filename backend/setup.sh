@@ -3,10 +3,10 @@
 
 echo "Starting Host Infrastructure Setup..."
 
-# 1. Install Podman
-echo "Installing Podman..."
+# 1. Install Docker (if not already installed)
+echo "Installing Docker..."
 sudo apt-get update
-sudo apt-get install -y podman
+sudo apt-get install -y docker.io
 
 # 2. Download and install gVisor (runsc)
 echo "Downloading gVisor (runsc)..."
@@ -24,15 +24,14 @@ rm -f *.sha512
 chmod a+rx runsc containerd-shim-runsc-v1
 sudo mv runsc containerd-shim-runsc-v1 /usr/local/bin
 
-# 3. Configure Podman to use gVisor
-echo "Configuring Podman runtimes..."
-sudo mkdir -p /etc/containers
-# Create or overwrite the containers.conf file with the runsc configuration
-cat <<EOF | sudo tee /etc/containers/containers.conf > /dev/null
-[engine.runtimes]
-runsc = [
-    "/usr/local/bin/runsc"
-]
-EOF
+# 3. Configure Docker to use gVisor
+echo "Configuring Docker runtimes..."
 
-echo "Setup Complete! You can now use --runtime=runsc with Podman."
+# The 'runsc install' command automatically updates /etc/docker/daemon.json
+sudo /usr/local/bin/runsc install
+
+# Restart Docker so it loads the new gVisor runtime
+echo "Restarting Docker daemon..."
+sudo systemctl restart docker
+
+echo "Setup Complete! You can now use --runtime=runsc with Docker."
