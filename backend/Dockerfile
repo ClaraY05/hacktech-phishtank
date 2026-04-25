@@ -1,38 +1,37 @@
-# 1. Use the official Playwright Python image
-# This automatically handles all the complex OS-level dependencies required for Chromium
-FROM mcr.microsoft.com/playwright/python:v1.47.0-jammy
+# Microsoft's official Playwright Python image. Chromium + every
+# OS-level dependency Playwright needs are already installed and
+# pinned to a known-good combination, so we don't have to fight
+# `playwright install` on slim-bullseye.
+FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
 
-# 2. Set environment variables to optimize Python inside Docker
-# PYTHONUNBUFFERED: Forces Python to print logs immediately (critical for seeing worker output)
-# PYTHONDONTWRITEBYTECODE: Stops Python from writing useless .pyc files in the container
+# PYTHONUNBUFFERED=1     -> stdout flushes immediately so the parent
+#                           podman process sees worker output without
+#                           waiting for buffering.
+# PYTHONDONTWRITEBYTECODE=1 -> no .pyc clutter in the read-only image.
+# PYTHONPATH points at our /src so `from sandbox import ...` works.
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH="/home/pwuser/app/src"
 
-# 3. Create a non-root user for security
-RUN useradd -m pwuser
-
-# 4. Set the working directory inside the container
 WORKDIR /home/pwuser/app
 
-# 5. Copy your build configuration files first
-# We do this before copying the code to leverage Docker's layer caching.
-# If you only change your python code, Docker won't have to re-download all your pip packages.
-COPY pyproject.toml README.md ./
+# Copy build config first so the pip install layer is cached when
+# only source files change.
+COPY pyproject.toml ./
 
-# 6. Copy the actual source code folder
 COPY src/ ./src/
 
-# 7. Install your project and its dependencies exactly as defined in pyproject.toml
 RUN pip install --no-cache-dir .
 
-# 8. Transfer ownership of the files to your secure user
+# The base image ships a non-root `pwuser` account; chown the app
+# tree to it and drop privileges before exec.
 RUN chown -R pwuser:pwuser /home/pwuser/app
-
-# 9. Switch to the non-root user to run the application
 USER pwuser
 
-# 10. Default entrypoint: run sandbox.py and emit a SandboxResult JSON
-# on stdout (status messages go to stderr). The URL to capture is
-# passed as the container's argument:
-#   podman run --rm --runtime=runsc safelink-sandbox https://example.com
-ENTRYPOINT ["python", "src/sandbox.py"]
+# One-shot worker. Receives the URL as the container argument and
+# prints a SandboxResult JSON document on stdout. Status / error
+# messages go to stderr.
+#
+#   podman run --rm safe-link-worker https://example.com
+#   podman run --rm --runtime=runsc safe-link-worker https://example.com
+ENTRYPOINT ["python", "src/worker.py"]

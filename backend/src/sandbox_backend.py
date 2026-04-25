@@ -184,9 +184,12 @@ def get_backend() -> SandboxBackend:
         return InProcessBackend()
 
     if name == "podman":
+        # Defaults match the image built by backend/Dockerfile; gVisor
+        # opt-in (USE_RUNSC=1) until the host has runsc registered as
+        # a podman runtime — see backend/setup.sh.
         return PodmanBackend(
-            image=os.getenv("SANDBOX_IMAGE", "safelink-sandbox"),
-            use_runsc=os.getenv("USE_RUNSC", "1") == "1",
+            image=os.getenv("SANDBOX_IMAGE", "safe-link-worker"),
+            use_runsc=os.getenv("USE_RUNSC", "0") == "1",
             timeout_s=float(os.getenv("SANDBOX_TIMEOUT_S", "30")),
             podman_path=os.getenv("PODMAN_PATH", shutil.which("podman") or "podman"),
             memory=os.getenv("SANDBOX_MEMORY", "1g"),

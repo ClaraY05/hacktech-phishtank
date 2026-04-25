@@ -19,12 +19,16 @@ This service is intended to:
 - `src/sandbox.py`: Playwright headless-Chromium capture (screenshot +
   redirect chain, popups, downloads, network, external domains, link
   enumeration with URL-string suspicion scoring).
+- `src/worker.py`: One-shot container entrypoint. Receives a URL on
+  argv, calls `sandbox.capture()`, prints the `SandboxResult` JSON
+  on stdout. Used as the `Dockerfile` `ENTRYPOINT`.
 - `src/sandbox_backend.py`: Pluggable sandbox-backend layer
   (`InProcessBackend`, `PodmanBackend`, factory chosen by
   `SANDBOX_BACKEND` env var).
 - `src/cache.py`: TTL + single-flight cache for analyzed verdicts.
-- `Dockerfile`, `setup.sh`: container image + host bootstrap for the
-  Podman + gVisor sandbox (selected at runtime via `SANDBOX_BACKEND=podman`).
+- `Dockerfile`: built on top of `mcr.microsoft.com/playwright/python:v1.58.0-noble`
+  (Chromium pre-installed); image tag is `safe-link-worker`.
+- `setup.sh`: host bootstrap for Podman + gVisor on Linux/WSL.
 - `src/orchestrator.py`: Glue that runs the Gemma -> K2 pipeline and
   returns a unified risk response.
 - `tests/`: backend test scaffold.
@@ -41,13 +45,25 @@ backend's problem.
 | `SANDBOX_BACKEND` | What runs | Host isolation |
 |---|---|---|
 | `inprocess` (default) | `sandbox.capture()` in the FastAPI process | Chromium renderer sandbox + per-request `BrowserContext` only |
-| `podman` | `podman run --rm [--runtime=runsc] safelink-sandbox <url>` | Linux namespaces + cgroups + dropped caps + read-only rootfs + (with gVisor) syscall mediation |
+| `podman` | `podman run --rm [--runtime=runsc] safe-link-worker <url>` | Linux namespaces + cgroups + dropped caps + read-only rootfs + (with gVisor) syscall mediation |
 
-Switching is one env var. No code changes, same wire format
-(`SandboxResult` JSON), same orchestrator. To add a different isolation
-strategy later (long-running sandbox worker over HTTP, remote sandbox
-service, etc.), implement the ``SandboxBackend`` protocol in
-`src/sandbox_backend.py` and add it to ``get_backend()``.
+Switching is one env var. Same wire format (`SandboxResult` JSON),
+same orchestrator, same downstream Gemma -> K2. To add a different
+isolation strategy later (long-running sandbox worker over HTTP,
+remote sandbox service, etc.), implement the ``SandboxBackend`` protocol
+in `src/sandbox_backend.py` and add it to ``get_backend()``.
+
+### Building the Podman image
+
+```bash
+cd backend
+podman build -t safe-link-worker .
+podman run --rm safe-link-worker https://example.com   # smoke test
+```
+
+Once the container prints a `SandboxResult` JSON to stdout, flip
+`SANDBOX_BACKEND=podman` in the host backend `.env` and restart
+uvicorn. No code changes required.
 
 ### Podman backend tunables
 
@@ -55,8 +71,8 @@ Defaults are deliberately strict; override per env var as needed:
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `SANDBOX_IMAGE` | `safelink-sandbox` | Container image tag |
-| `USE_RUNSC` | `1` | Add `--runtime=runsc` (gVisor) |
+| `SANDBOX_IMAGE` | `safe-link-worker` | Container image tag |
+| `USE_RUNSC` | `0` | Add `--runtime=runsc` (gVisor); flip to `1` after `setup.sh` registers runsc |
 | `SANDBOX_TIMEOUT_S` | `30` | Wall-clock cap per request |
 | `PODMAN_PATH` | autodetect | Override podman binary location |
 | `SANDBOX_NETWORK` | unset | Podman network name (use a restrictive CNI to block LAN egress) |
