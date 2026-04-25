@@ -23,8 +23,12 @@ This service is intended to:
 2. Install package with dev dependencies:
    - `pip install -e ".[dev]"`
 3. Copy `.env.example` to `.env` and fill in `K2_API_KEY`.
+4. Run ./setup.sh (`chmod +x ./setup` if needed)
 
 ## Run (placeholder app)
+```bash
+docker build -t safe-link-worker .
+```
 
 ```bash
 uvicorn main:app --reload --app-dir src
