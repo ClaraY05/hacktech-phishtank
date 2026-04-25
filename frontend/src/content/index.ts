@@ -1,8 +1,60 @@
 console.log("AI Safe Link content script injected", window.location.href);
 
+const MAX_HTML_CHARS = 200_000;
+const MAX_LINKS = 500;
+const SUSPICIOUS_KEYWORDS = [
+  "verify account",
+  "urgent",
+  "suspended",
+  "password",
+  "login",
+  "bank",
+  "security alert",
+];
+
+function sanitizeHtmlForAnalysis(documentRoot: Document): string {
+  const clonedDocument = documentRoot.documentElement.cloneNode(true) as HTMLElement;
+
+  clonedDocument.querySelectorAll("script, style, noscript").forEach((node) => node.remove());
+
+  clonedDocument.querySelectorAll("*").forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.toLowerCase().startsWith("on")) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+
+  clonedDocument.querySelectorAll("input").forEach((input) => {
+    const typeValue = (input.getAttribute("type") || "").toLowerCase();
+    if (typeValue === "password" || typeValue === "email" || typeValue === "tel") {
+      input.setAttribute("value", "");
+    }
+  });
+
+  const html = clonedDocument.outerHTML;
+  return html.slice(0, MAX_HTML_CHARS);
+}
+
+function collectDomSignals(documentRoot: Document) {
+  const bodyText = (documentRoot.body?.innerText || "").toLowerCase();
+  const suspiciousKeywords = SUSPICIOUS_KEYWORDS.filter((keyword) => bodyText.includes(keyword));
+
+  return {
+    has_password_form: documentRoot.querySelector('input[type="password"]') !== null,
+    num_forms: documentRoot.querySelectorAll("form").length,
+    num_iframes: documentRoot.querySelectorAll("iframe").length,
+    num_external_scripts: Array.from(documentRoot.querySelectorAll("script[src]")).filter((script) => {
+      const src = script.getAttribute("src");
+      return src ? !src.startsWith("/") && !src.startsWith(window.location.origin) : false;
+    }).length,
+    suspicious_keywords: suspiciousKeywords,
+  };
+}
+
 const discoveredLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"));
 
-const payload = discoveredLinks.map((link) => ({
+const payload = discoveredLinks.slice(0, MAX_LINKS).map((link) => ({
   url: link.href,
   text: (link.textContent || "").trim(),
 }));
@@ -22,15 +74,17 @@ document.body.appendChild(badge);
 // Placeholder hook: replace with background message or direct API request later.
 if (payload.length > 0) {
   console.log(`AI Safe Link found ${payload.length} links on page`);
-  payload.forEach((item, index) => {
-    console.log(`[AI Safe Link] Link ${index + 1}:`, item.url, "| text:", item.text);
-  });
+  const domSignals = collectDomSignals(document);
+  const sanitizedHtmlExcerpt = sanitizeHtmlForAnalysis(document);
 
   chrome.runtime.sendMessage(
     {
       type: "ANALYZE_LINKS",
       pageUrl: window.location.href,
       links: payload,
+      domSignals,
+      sanitizedHtmlExcerpt,
+      contentHashHint: `${window.location.hostname}:${payload.length}:${sanitizedHtmlExcerpt.length}`,
     },
     (response) => {
       if (chrome.runtime.lastError) {

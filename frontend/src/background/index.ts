@@ -12,6 +12,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       body: JSON.stringify({
         page_url: message.pageUrl,
         links: message.links,
+        dom_signals: message.domSignals,
+        sanitized_html_excerpt: message.sanitizedHtmlExcerpt,
+        content_hash_hint: message.contentHashHint,
       }),
     })
       .then(async (response) => {
