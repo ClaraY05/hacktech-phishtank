@@ -4,7 +4,7 @@ The request path is intentionally thin:
 
     /analyze-link
         -> AnalysisCache.get_or_compute(canonical_url, factory)
-              -> SandboxBackend(url)              # in-process or podman
+              -> SandboxBackend(url)              # in-process or docker
               -> orchestrator.analyze_link(...)   # Gemma -> K2
 
     /send-batch-links

@@ -19,12 +19,16 @@ This service is intended to:
 - `src/sandbox.py`: Playwright headless-Chromium capture (screenshot +
   redirect chain, popups, downloads, network, external domains, link
   enumeration with URL-string suspicion scoring).
+- `src/worker.py`: One-shot container entrypoint. Receives a URL on
+  argv, calls `sandbox.capture()`, prints the `SandboxResult` JSON
+  on stdout. Used as the `Dockerfile` `ENTRYPOINT`.
 - `src/sandbox_backend.py`: Pluggable sandbox-backend layer
-  (`InProcessBackend`, `PodmanBackend`, factory chosen by
+  (`InProcessBackend`, `DockerBackend`, factory chosen by
   `SANDBOX_BACKEND` env var).
 - `src/cache.py`: TTL + single-flight cache for analyzed verdicts.
-- `Dockerfile`, `setup.sh`: container image + host bootstrap for the
-  Podman + gVisor sandbox (selected at runtime via `SANDBOX_BACKEND=podman`).
+- `Dockerfile`: built on top of `mcr.microsoft.com/playwright/python:v1.58.0-noble`
+  (Chromium pre-installed); image tag is `safe-link-worker`.
+- `setup.sh`: host bootstrap for Docker + gVisor on Linux/WSL.
 - `src/orchestrator.py`: Glue that runs the Gemma -> K2 pipeline and
   returns a unified risk response.
 - `tests/`: backend test scaffold.
@@ -41,25 +45,37 @@ backend's problem.
 | `SANDBOX_BACKEND` | What runs | Host isolation |
 |---|---|---|
 | `inprocess` (default) | `sandbox.capture()` in the FastAPI process | Chromium renderer sandbox + per-request `BrowserContext` only |
-| `podman` | `podman run --rm [--runtime=runsc] safelink-sandbox <url>` | Linux namespaces + cgroups + dropped caps + read-only rootfs + (with gVisor) syscall mediation |
+| `docker` | `docker run --rm [--runtime=runsc] safe-link-worker <url>` | Linux namespaces + cgroups + dropped caps + read-only rootfs + (with gVisor) syscall mediation |
 
-Switching is one env var. No code changes, same wire format
-(`SandboxResult` JSON), same orchestrator. To add a different isolation
-strategy later (long-running sandbox worker over HTTP, remote sandbox
-service, etc.), implement the ``SandboxBackend`` protocol in
-`src/sandbox_backend.py` and add it to ``get_backend()``.
+Switching is one env var. Same wire format (`SandboxResult` JSON),
+same orchestrator, same downstream Gemma -> K2. To add a different
+isolation strategy later (long-running sandbox worker over HTTP,
+remote sandbox service, etc.), implement the ``SandboxBackend`` protocol
+in `src/sandbox_backend.py` and add it to ``get_backend()``.
 
-### Podman backend tunables
+### Building the Docker image
+
+```bash
+cd backend
+docker build -t safe-link-worker .
+docker run --rm safe-link-worker https://example.com   # smoke test
+```
+
+Once the container prints a `SandboxResult` JSON to stdout, flip
+`SANDBOX_BACKEND=docker` in the host backend `.env` and restart
+uvicorn. No code changes required.
+
+### Docker backend tunables
 
 Defaults are deliberately strict; override per env var as needed:
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `SANDBOX_IMAGE` | `safelink-sandbox` | Container image tag |
-| `USE_RUNSC` | `1` | Add `--runtime=runsc` (gVisor) |
+| `SANDBOX_IMAGE` | `safe-link-worker` | Container image tag |
+| `USE_RUNSC` | `0` | Add `--runtime=runsc` (gVisor); flip to `1` after `setup.sh` registers runsc in `/etc/docker/daemon.json` |
 | `SANDBOX_TIMEOUT_S` | `30` | Wall-clock cap per request |
-| `PODMAN_PATH` | autodetect | Override podman binary location |
-| `SANDBOX_NETWORK` | unset | Podman network name (use a restrictive CNI to block LAN egress) |
+| `DOCKER_PATH` | autodetect | Override docker binary location |
+| `SANDBOX_NETWORK` | unset | Docker network name (use a restrictive bridge net to block LAN egress) |
 | `SANDBOX_MEMORY` | `1g` | cgroup memory cap |
 | `SANDBOX_CPUS` | `1.0` | cgroup CPU cap |
 | `SANDBOX_PIDS_LIMIT` | `200` | Fork-bomb guard |
@@ -107,9 +123,10 @@ inside `cache.AnalysisCache` for a Redis-backed implementation; the
 3. Install the Chromium browser used by Playwright (one-time, ~170MB):
    - `playwright install chromium`
 4. Copy `.env.example` to `.env` and fill in `K2_API_KEY` and `GEMINI_API_KEY`.
-5. (Container host only, Linux/WSL) Install Podman + gVisor for the
-   future containerized sandbox: `chmod +x ./setup.sh && ./setup.sh`.
-   Not needed for in-process Playwright dev on macOS.
+5. (Container host only, Linux/WSL) Install Docker + gVisor for the
+   containerized sandbox: `chmod +x ./setup.sh && ./setup.sh`. On
+   macOS use Docker Desktop directly; setup.sh is not needed there.
+   Not needed at all for in-process Playwright dev.
 
 ## Run (placeholder app)
 
@@ -202,11 +219,11 @@ print(result.content)
 4. The orchestrator returns a unified `UnifiedRiskResponse`
    (`risk`, `score`, `explanation`, `key_signals`, `gemma_vision`).
 
-Future work: moving Playwright into a per-request Podman + gVisor
-container (`Dockerfile` and `setup.sh` already in place; FastAPI just
-needs to swap `capture()` to spawn the container instead of running
-Playwright in-process). The capture API and the orchestrator stay the
-same when that lands.
+Future work: moving Playwright into a per-request Docker + gVisor
+container (`Dockerfile` and `setup.sh` already in place; flip
+`SANDBOX_BACKEND=docker` and `DockerBackend` will spawn the container
+per request instead of running Playwright in-process). The capture API
+and the orchestrator stay the same when that lands.
 
 ## Gemma 4 Vision Client
 
