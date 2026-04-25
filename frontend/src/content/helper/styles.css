@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
 .ai-safe-link-highlight {
   position: relative;
   outline: 2px solid transparent;
@@ -39,6 +41,7 @@
   border-radius: 6px;
   background: linear-gradient(to right, rgba(17, 17, 17, 0.68), rgba(17, 17, 17, 0.5));
   color: #fff;
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 12px;
   line-height: 1.35;
   box-shadow:  0 2px 6px rgba(0, 0, 0, 0.15),0 10px 20px rgba(0, 0, 0, 0.2);

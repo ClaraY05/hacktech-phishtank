@@ -18,6 +18,8 @@ type BubbleState = "enabled" | "disabled" | "analyzing";
 // Set to "enabled", "disabled", or "analyzing" when testing.
 const LOCAL_BUBBLE_STATE_OVERRIDE: BubbleState | null = "analyzing";
 const DEFAULT_LINK_HIGHLIGHT_CSS = `
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
 .ai-safe-link-highlight {
   position: relative;
   outline: 2px solid transparent;
@@ -59,6 +61,7 @@ const DEFAULT_LINK_HIGHLIGHT_CSS = `
   border-radius: 6px;
   background: linear-gradient(to right, rgba(17, 17, 17, 0.68), rgba(17, 17, 17, 0.5));
   color: #fff;
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 16px;
   line-height: 1.35;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
@@ -522,6 +525,7 @@ export function showBadge(totalLinks: number): void {
   badge.style.zIndex = "999999";
   badge.style.background = "linear-gradient(to right, rgba(17, 17, 17, 0.68), rgba(17, 17, 17, 0.5))";
   badge.style.color = "#fff";
+  badge.style.fontFamily = "\"Plus Jakarta Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif";
   badge.style.fontSize = "12px";
   badge.style.lineHeight = "1.35";
   badge.style.padding = "8px 10px";
