@@ -3,11 +3,20 @@ const HIGHLIGHT_CLASS = "ai-safe-link-highlight";
 const TOOLTIP_ATTR = "data-ai-safe-tooltip";
 const TOOLTIP_ID = "ai-safe-link-tooltip";
 const TOOLTIP_VISIBLE_CLASS = "is-visible";
+const TOOLTIP_ANALYZING_CLASS = "is-analyzing";
 const TOOLTIP_GAP_PX = 8;
 const BADGE_ID = "ai-safe-link-badge";
+const BADGE_ANALYZING_CLASS = "ai-safe-link-badge--analyzing";
 const ACTIVATION_STORAGE_KEY = "aiSafeLinkIsActive";
-const INACTIVE_BADGE_TEXT = "AI Safe Link inactive (click to enable)";
+const DISABLED_BADGE_TEXT = "AI Safe Link disabled (click to enable)";
 const ACTIVE_BADGE_SUFFIX = " (click to disable)";
+const ANALYZING_BADGE_TEXT_SHORT = "AI Safe Link: analyzing.";
+const ANALYZING_BADGE_TEXT_LONG = "AI Safe Link: analyzing...";
+type BubbleState = "enabled" | "disabled" | "analyzing";
+
+// Local testing override for corner bubble state.
+// Set to "enabled", "disabled", or "analyzing" when testing.
+const LOCAL_BUBBLE_STATE_OVERRIDE: BubbleState | null = "analyzing";
 const DEFAULT_LINK_HIGHLIGHT_CSS = `
 .ai-safe-link-highlight {
   position: relative;
@@ -64,6 +73,30 @@ const DEFAULT_LINK_HIGHLIGHT_CSS = `
 .ai-safe-link-tooltip.is-visible {
   opacity: 1;
 }
+
+.ai-safe-link-tooltip.is-analyzing {
+  text-align: center;
+}
+
+@keyframes aiSafeLinkBadgeAnalyzingRing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0), 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.ai-safe-link-badge--analyzing {
+  width: 210px;
+  box-sizing: border-box;
+  text-align: center;
+  border-color: rgba(255, 255, 255, 0.88) !important;
+  animation: aiSafeLinkBadgeAnalyzingRing 1.4s ease-out infinite;
+}
 `;
 
 let tooltipElement: HTMLDivElement | null = null;
@@ -74,6 +107,13 @@ let storageSyncInitialized = false;
 let isFeatureActive = true;
 let activationStateInitialized = false;
 let currentBadgeLinkCount = 0;
+let bubbleState: BubbleState = "enabled";
+let analyzingDotsIntervalId: number | null = null;
+let showLongAnalyzingText = false;
+
+function isLinkUiEnabled(): boolean {
+  return bubbleState !== "disabled";
+}
 
 function getAllLinks(): HTMLAnchorElement[] {
   return Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"));
@@ -83,13 +123,83 @@ function updateBadgeText(): void {
   if (!badgeElement) {
     return;
   }
-  badgeElement.textContent = isFeatureActive
-    ? `AI Safe Link active: found ${currentBadgeLinkCount} links${ACTIVE_BADGE_SUFFIX}`
-    : INACTIVE_BADGE_TEXT;
+
+  if (bubbleState === "analyzing") {
+    badgeElement.textContent = showLongAnalyzingText
+      ? ANALYZING_BADGE_TEXT_LONG
+      : ANALYZING_BADGE_TEXT_SHORT;
+    return;
+  }
+
+  badgeElement.textContent =
+    bubbleState === "enabled"
+      ? `AI Safe Link active: found ${currentBadgeLinkCount} links${ACTIVE_BADGE_SUFFIX}`
+      : DISABLED_BADGE_TEXT;
+}
+
+function updateBadgeVisualState(): void {
+  if (!badgeElement) {
+    return;
+  }
+
+  if (bubbleState === "analyzing") {
+    badgeElement.classList.add(BADGE_ANALYZING_CLASS);
+    badgeElement.style.boxShadow = "";
+    badgeElement.style.borderColor = "";
+    return;
+  }
+
+  badgeElement.classList.remove(BADGE_ANALYZING_CLASS);
+  badgeElement.style.borderColor = "transparent";
+  badgeElement.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2)";
+}
+
+function stopAnalyzingTextEffect(): void {
+  if (analyzingDotsIntervalId === null) {
+    return;
+  }
+  window.clearInterval(analyzingDotsIntervalId);
+  analyzingDotsIntervalId = null;
+}
+
+function startAnalyzingTextEffect(): void {
+  if (analyzingDotsIntervalId !== null) {
+    return;
+  }
+
+  analyzingDotsIntervalId = window.setInterval(() => {
+    if (bubbleState !== "analyzing") {
+      stopAnalyzingTextEffect();
+      return;
+    }
+    showLongAnalyzingText = !showLongAnalyzingText;
+    updateBadgeText();
+  }, 550);
+}
+
+function syncBadgeStatusFromActivation(): void {
+  if (LOCAL_BUBBLE_STATE_OVERRIDE) {
+    bubbleState = LOCAL_BUBBLE_STATE_OVERRIDE;
+    isFeatureActive = bubbleState !== "disabled";
+    return;
+  }
+  bubbleState = isFeatureActive ? "enabled" : "disabled";
+}
+
+function refreshBadgeState(): void {
+  syncBadgeStatusFromActivation();
+  if (bubbleState === "analyzing") {
+    startAnalyzingTextEffect();
+  } else {
+    stopAnalyzingTextEffect();
+    showLongAnalyzingText = false;
+  }
+  updateBadgeText();
+  updateBadgeVisualState();
 }
 
 function applyFeatureStateToLink(link: HTMLAnchorElement): void {
-  if (isFeatureActive) {
+  if (isLinkUiEnabled()) {
     link.classList.add(HIGHLIGHT_CLASS);
     return;
   }
@@ -103,7 +213,7 @@ function applyFeatureStateToAllLinks(): void {
     applyFeatureStateToLink(link);
   });
 
-  if (!isFeatureActive) {
+  if (!isLinkUiEnabled()) {
     hideTooltip();
   }
 }
@@ -126,7 +236,7 @@ function initializeStorageSync(): void {
 
     isFeatureActive = nextValue;
     applyFeatureStateToAllLinks();
-    updateBadgeText();
+    refreshBadgeState();
   });
 }
 
@@ -157,10 +267,31 @@ export function isFeatureActivationEnabled(): boolean {
   return isFeatureActive;
 }
 
+export function getBubbleState(): BubbleState {
+  return bubbleState;
+}
+
+export function setBadgeAnalyzing(isAnalyzing: boolean): void {
+  if (LOCAL_BUBBLE_STATE_OVERRIDE) {
+    bubbleState = LOCAL_BUBBLE_STATE_OVERRIDE;
+  } else {
+    bubbleState = isAnalyzing ? "analyzing" : isFeatureActive ? "enabled" : "disabled";
+  }
+
+  if (bubbleState === "analyzing") {
+    startAnalyzingTextEffect();
+  } else {
+    stopAnalyzingTextEffect();
+    showLongAnalyzingText = false;
+  }
+  updateBadgeText();
+  updateBadgeVisualState();
+}
+
 async function setFeatureActivation(nextValue: boolean): Promise<void> {
   isFeatureActive = nextValue;
   applyFeatureStateToAllLinks();
-  updateBadgeText();
+  refreshBadgeState();
   hideTooltip();
 
   try {
@@ -208,7 +339,7 @@ function placeTooltipForLink(link: HTMLAnchorElement, tooltip: HTMLDivElement): 
 }
 
 function showTooltip(link: HTMLAnchorElement): void {
-  if (!isFeatureActive) {
+  if (!isLinkUiEnabled()) {
     return;
   }
 
@@ -219,6 +350,11 @@ function showTooltip(link: HTMLAnchorElement): void {
 
   const tooltip = ensureTooltipElement();
   tooltip.textContent = text;
+  if (bubbleState === "analyzing") {
+    tooltip.classList.add(TOOLTIP_ANALYZING_CLASS);
+  } else {
+    tooltip.classList.remove(TOOLTIP_ANALYZING_CLASS);
+  }
   placeTooltipForLink(link, tooltip);
   tooltip.classList.add(TOOLTIP_VISIBLE_CLASS);
 }
@@ -367,14 +503,14 @@ export function showBadge(totalLinks: number): void {
   currentBadgeLinkCount = totalLinks;
 
   if (badgeElement?.isConnected) {
-    updateBadgeText();
+    refreshBadgeState();
     return;
   }
 
   const existing = document.getElementById(BADGE_ID);
   if (existing && existing instanceof HTMLDivElement) {
     badgeElement = existing;
-    updateBadgeText();
+    refreshBadgeState();
     return;
   }
 
@@ -396,18 +532,27 @@ export function showBadge(totalLinks: number): void {
   badge.style.cursor = "pointer";
   badge.style.userSelect = "none";
   badge.addEventListener("mouseenter", () => {
+    if (bubbleState === "analyzing") {
+      return;
+    }
     badge.style.borderColor = "rgba(255, 255, 255, 0.75)";
     badge.style.boxShadow = "0 0 0 1px rgba(255, 255, 255, 0.2), 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2)";
   });
   badge.addEventListener("mouseleave", () => {
+    if (bubbleState === "analyzing") {
+      return;
+    }
     badge.style.borderColor = "transparent";
     badge.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2)";
   });
   badge.addEventListener("click", () => {
+    if (bubbleState === "analyzing") {
+      return;
+    }
     void setFeatureActivation(!isFeatureActive);
   });
 
   badgeElement = badge;
-  updateBadgeText();
+  refreshBadgeState();
   document.body.appendChild(badge);
 }

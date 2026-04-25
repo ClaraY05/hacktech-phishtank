@@ -73,6 +73,36 @@ Optional for faster iteration:
 - Content -> background send behavior: `src/content/helper/messages.ts`
 - Background -> backend request behavior: `src/background/helper/apiClient.ts`
 
+## State Testing (dataflow.md alignment)
+
+The corner bubble now follows the global states described in `../dataflow.md`:
+
+- `enabled`
+- `disabled`
+- `analyzing`
+
+For local testing, set this variable in `src/content/helper/styling.ts`:
+
+- `LOCAL_BUBBLE_STATE_OVERRIDE`
+
+Example values:
+
+- `null` -> normal runtime behavior
+- `"enabled"` -> active hover/tooltips + backend query flow
+- `"disabled"` -> hover/tooltips off, no backend query
+- `"analyzing"` -> badge shows analyzing state, tooltip shows "Analysis in progress", no backend query
+
+### Test Steps
+
+1. Edit `src/content/helper/styling.ts` and set `LOCAL_BUBBLE_STATE_OVERRIDE`.
+2. Build: `npm run build`
+3. Reload extension in `chrome://extensions`.
+4. Refresh target page.
+5. Validate expected behavior:
+   - `enabled`: hover border + tooltip details from backend.
+   - `disabled`: no hover effect and no tooltip.
+   - `analyzing`: analyzing badge effect + tooltip text "Analysis in progress" without backend link analysis request.
+
 ## Notes
 
 - This is scaffold-only; it does not yet call your backend endpoint.

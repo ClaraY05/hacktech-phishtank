@@ -53,3 +53,27 @@
 .ai-safe-link-tooltip.is-visible {
   opacity: 1;
 }
+
+.ai-safe-link-tooltip.is-analyzing {
+  text-align: center;
+}
+
+@keyframes aiSafeLinkBadgeAnalyzingRing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0), 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0), 0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.ai-safe-link-badge--analyzing {
+  width: 210px;
+  box-sizing: border-box;
+  text-align: center;
+  border-color: rgba(255, 255, 255, 0.88) !important;
+  animation: aiSafeLinkBadgeAnalyzingRing 1.4s ease-out infinite;
+}

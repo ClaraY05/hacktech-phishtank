@@ -22,7 +22,6 @@
     }
   ],
   "action": {
-    "default_title": "AI Safe Link",
-    "default_popup": "src/popup/popup.html"
+    "default_title": "AI Safe Link"
   }
 }

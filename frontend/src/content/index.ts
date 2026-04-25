@@ -2,8 +2,10 @@ import { discoverLinks, buildLinkPayload } from "./helper/linkScanner";
 import { collectDomSignals, sanitizeHtmlForAnalysis } from "./helper/sanitizer";
 import {
   applyLinkTooltips,
+  getBubbleState,
   highlightLinks,
   initializeFeatureActivationState,
+  setBadgeAnalyzing,
   showBadge,
 } from "./helper/styling";
 import { buildAnalyzePayload } from "./helper/payloadBuilder";
@@ -12,6 +14,7 @@ import { sendAnalyzeLinksMessage } from "./helper/messages";
 const MAX_HTML_CHARS = 200_000;
 const MAX_LINKS = 500;
 const FALLBACK_TOOLTIP_TEXT = "AI Safe Link: no analysis details available yet.";
+const ANALYZING_TOOLTIP_TEXT = "analysis in progress";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -81,6 +84,16 @@ async function runContentFlow(): Promise<void> {
 
   const payloadLinks = buildLinkPayload(discoveredLinks, MAX_LINKS);
   showBadge(payloadLinks.length);
+  const bubbleState = getBubbleState();
+
+  if (bubbleState === "disabled") {
+    return;
+  }
+
+  if (bubbleState === "analyzing") {
+    applyLinkTooltips(discoveredLinks, [], ANALYZING_TOOLTIP_TEXT);
+    return;
+  }
 
   if (payloadLinks.length === 0) {
     return;
@@ -96,7 +109,9 @@ async function runContentFlow(): Promise<void> {
     sanitizedHtmlExcerpt,
   });
 
+  setBadgeAnalyzing(true);
   const response = await sendAnalyzeLinksMessage(message);
+  setBadgeAnalyzing(false);
   if (!response.ok) {
     applyLinkTooltips(discoveredLinks, [], FALLBACK_TOOLTIP_TEXT);
     return;

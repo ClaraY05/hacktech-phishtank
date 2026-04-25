@@ -38,6 +38,7 @@ Controls global extension state and determines whether link-level analysis is ac
 
    #### `analyzing`
    - Display: "Analyzing..."
+   - Hover tooltips remain enabled and show: "analysis in progress"
    - No link queries allowed
    - Poll backend until status becomes `true`
 
@@ -80,7 +81,7 @@ Controls global extension state and determines whether link-level analysis is ac
 
 #### If `analyzing`
 - Tooltip displays:
-  - "Analysis in progress"
+  - "analysis in progress"
 - No backend query is made
 
 ---
