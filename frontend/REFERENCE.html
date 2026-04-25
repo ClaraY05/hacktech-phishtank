@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sandcastle — Safety Sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Core palette anchored to #f5b301 yellow */
+  --yellow:       #f5b301;
+  --yellow-light: rgba(245, 179, 1, 0.12);
+  --yellow-mid:   rgba(245, 179, 1, 0.22);
+  --yellow-border:rgba(245, 179, 1, 0.35);
+
+  /* Complementary: deep teal (split-complement) + warm coral (analogous) */
+  --teal:         #0a8c7a;
+  --teal-light:   rgba(10, 140, 122, 0.10);
+  --teal-border:  rgba(10, 140, 122, 0.25);
+
+  --coral:        #e8472f;
+  --coral-light:  rgba(232, 71, 47, 0.09);
+  --coral-border: rgba(232, 71, 47, 0.22);
+
+  --violet:       #6b3fa0;
+  --violet-light: rgba(107, 63, 160, 0.09);
+  --violet-border:rgba(107, 63, 160, 0.2);
+
+  /* Neutrals — very clean / near white */
+  --bg:       #f7f7f5;
+  --paper:    #ffffff;
+  --ink:      #111110;
+  --ink-2:    #2e2d2b;
+  --muted:    #6b6760;
+  --faint:    #9e9a94;
+  --border:   rgba(0,0,0,0.07);
+  --border-md:rgba(0,0,0,0.12);
+
+  --shadow-card: 0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-hover: 0 6px 24px rgba(0,0,0,0.09), 0 2px 6px rgba(0,0,0,0.05);
+
+  /* Gaussian orb colors — strong, vivid */
+  --orb-yellow: rgba(245, 179, 1,   0.55);
+  --orb-teal:   rgba(10, 180, 155,  0.42);
+  --orb-coral:  rgba(232, 71, 47,   0.38);
+  --orb-violet: rgba(130, 70, 200,  0.32);
+  --orb-amber:  rgba(255, 140, 30,  0.40);
+}
+
+/* ===== BACKGROUND SYSTEM ===== */
+body {
+  font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+  position: relative;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* Strong gaussian orbs — much more vivid than v3 */
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+/* Yellow — top left hero orb */
+.orb-1 {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle at 40% 40%, var(--orb-yellow) 0%, transparent 65%);
+  filter: blur(80px);
+  top: -220px; left: -160px;
+  animation: drift1 30s ease-in-out infinite;
+}
+/* Teal — top right */
+.orb-2 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle at 50% 50%, var(--orb-teal) 0%, transparent 65%);
+  filter: blur(90px);
+  top: -80px; right: -150px;
+  animation: drift2 38s ease-in-out infinite;
+}
+/* Coral — middle left */
+.orb-3 {
+  width: 460px; height: 460px;
+  background: radial-gradient(circle at 50% 50%, var(--orb-coral) 0%, transparent 65%);
+  filter: blur(85px);
+  top: 45%; left: -100px;
+  animation: drift3 42s ease-in-out infinite;
+}
+/* Violet — center */
+.orb-4 {
+  width: 420px; height: 420px;
+  background: radial-gradient(circle at 50% 50%, var(--orb-violet) 0%, transparent 65%);
+  filter: blur(100px);
+  top: 30%; left: 38%;
+  animation: drift4 34s ease-in-out infinite;
+}
+/* Amber — bottom right */
+.orb-5 {
+  width: 520px; height: 520px;
+  background: radial-gradient(circle at 50% 60%, var(--orb-amber) 0%, transparent 65%);
+  filter: blur(75px);
+  bottom: -180px; right: -120px;
+  animation: drift5 46s ease-in-out infinite;
+}
+
+@keyframes drift1 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  33%  { transform: translate(50px, 80px) scale(1.06); }
+  66%  { transform: translate(-30px, 110px) scale(0.96); }
+}
+@keyframes drift2 {
+  0%,100% { transform: translate(0,0); }
+  50%  { transform: translate(-80px, 60px) scale(1.08); }
+}
+@keyframes drift3 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  40%  { transform: translate(70px, -50px) scale(1.05); }
+  70%  { transform: translate(-20px, -90px) scale(0.94); }
+}
+@keyframes drift4 {
+  0%,100% { transform: translate(0,0); }
+  60%  { transform: translate(-60px, 70px) scale(1.1); }
+}
+@keyframes drift5 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  45%  { transform: translate(-70px, -60px) scale(1.08); }
+}
+
+/* Light grain overlay */
+.bg-noise {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
+
+/* ===== APP SHELL ===== */
+.app {
+  position: relative;
+  z-index: 2;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 2rem 5rem;
+}
+
+/* ===== HEADER ===== */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 0 1.35rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.wordmark-icon {
+  width: 28px; height: 28px;
+  background: var(--yellow);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(245,179,1,0.4);
+}
+
+.wordmark-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.wordmark-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.57rem;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--border-md);
+  border-radius: 999px;
+}
+
+.header-right {
+  display: flex; align-items: center; gap: 1.5rem;
+}
+
+.header-meta {
+  display: flex; gap: 1.5rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.header-meta strong { color: var(--ink-2); font-weight: 600; }
+
+.live-badge {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--teal);
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--teal-border);
+  background: var(--teal-light);
+  backdrop-filter: blur(8px);
+}
+
+.live-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--teal);
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
+}
+
+/* ===== LAYOUT ===== */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.left-col { display: flex; flex-direction: column; gap: 1.25rem; }
+.right-col { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* ===== CARD ===== */
+.card {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.75);
+  border-bottom-color: rgba(0,0,0,0.06);
+  border-right-color: rgba(0,0,0,0.06);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.card:hover { box-shadow: var(--shadow-hover); }
+
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1.1rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.4);
+}
+
+.card-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex; align-items: center; gap: 0.4rem;
+}
+
+.card-label-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--yellow);
+  flex-shrink: 0;
+}
+
+.card-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.57rem;
+  color: var(--faint);
+  padding: 0.16rem 0.48rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(247,247,245,0.8);
+}
+
+.card-count.threat {
+  color: var(--coral);
+  border-color: var(--coral-border);
+  background: var(--coral-light);
+}
+
+/* ===== CHIPS ===== */
+.chip {
+  display: inline-flex; align-items: center;
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.chip.safe   { color: var(--teal);   background: var(--teal-light);   border: 1px solid var(--teal-border); }
+.chip.threat { color: var(--coral);  background: var(--coral-light);  border: 1px solid var(--coral-border); }
+.chip.warn   { color: #a06800;       background: var(--yellow-light); border: 1px solid var(--yellow-border); }
+.chip.scan   { color: var(--violet); background: var(--violet-light); border: 1px solid var(--violet-border); animation: chipBlink 1.6s ease-in-out infinite; }
+
+@keyframes chipBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* ===== SCANNER BODY ===== */
+.scanner-body { padding: 1.1rem; }
+
+.scan-active {
+  background: rgba(255,255,255,0.65);
+  border: 1px solid var(--border-md);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex; align-items: center; gap: 0.8rem;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 1.1rem;
+}
+
+.scan-active::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(107,63,160,0.07), transparent);
+  animation: scanBeam 2.8s ease-in-out infinite;
+}
+
+@keyframes scanBeam { from { left:-60%; } to { left:130%; } }
+
+.scan-thumb {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  background: var(--coral-light);
+  border: 1px solid var(--coral-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.scan-info { flex: 1; min-width: 0; }
+
+.scan-url {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.18rem;
+}
+
+.scan-url .scheme { color: var(--muted); }
+.scan-url .domain { color: var(--coral); font-weight: 500; }
+
+.scan-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--faint);
+}
+
+/* ===== METRICS ===== */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1.1rem;
+}
+
+.metric {
+  background: rgba(255,255,255,0.6);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem 0.85rem;
+  position: relative;
+}
+
+.metric-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.45rem;
+}
+
+.metric-val {
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  margin-bottom: 0.35rem;
+  letter-spacing: -0.03em;
+}
+
+.metric-val.bad  { color: var(--coral); }
+.metric-val.warn { color: #c47a00; }
+.metric-val.ok   { color: var(--teal); }
+
+.metric-bar { height: 3px; border-radius: 999px; background: rgba(0,0,0,0.06); overflow: hidden; }
+.metric-fill { height: 100%; border-radius: 999px; }
+.fill-coral  { background: var(--coral); }
+.fill-yellow { background: var(--yellow); }
+.fill-teal   { background: var(--teal); }
+
+.ann {
+  position: absolute;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--faint);
+  top: 0.55rem; right: 0.65rem;
+  display: flex; align-items: center; gap: 0.2rem;
+}
+
+.ann-line { display: block; width: 10px; height: 1px; background: var(--border-md); }
+
+/* ===== QUEUE ===== */
+.section-ann {
+  display: flex; align-items: center; gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.section-ann-line { flex: 1; height: 1px; background: var(--border); }
+
+.section-ann-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  white-space: nowrap;
+}
+
+.queue {
+  background: rgba(255,255,255,0.5);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.q-row {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.58rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+
+.q-row:hover { background: rgba(245,179,1,0.04); }
+.q-row:last-child { border-bottom: none; }
+
+.q-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--faint);
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.q-url {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.63rem;
+  color: var(--ink-2);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== SPECIMENS ===== */
+.specimens-body { padding: 1.1rem; }
+
+.spec-intro {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
+.spec-intro-text {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.spec-intro-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.57rem;
+  color: var(--faint);
+}
+
+.jars-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.75rem;
+}
+
+.jar { display: flex; flex-direction: column; align-items: center; cursor: default; }
+
+.jar-lid {
+  width: calc(100% - 6px);
+  height: 6px;
+  border-radius: 3px 3px 0 0;
+  flex-shrink: 0;
+  border: 1px solid;
+  border-bottom: none;
+}
+
+.jar.threat .jar-lid { background: rgba(232,71,47,0.12); border-color: rgba(232,71,47,0.28); }
+.jar.warn   .jar-lid { background: rgba(245,179,1,0.18); border-color: rgba(245,179,1,0.38); }
+.jar.info   .jar-lid { background: rgba(107,63,160,0.1); border-color: rgba(107,63,160,0.22); }
+
+.jar-body {
+  width: 100%;
+  aspect-ratio: 1 / 1.3;
+  border: 1px solid;
+  border-radius: 0 0 8px 8px;
+  position: relative;
+  overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 7px;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(8px);
+}
+
+.jar.threat .jar-body { border-color: rgba(232,71,47,0.2); }
+.jar.warn   .jar-body { border-color: rgba(245,179,1,0.28); }
+.jar.info   .jar-body { border-color: rgba(107,63,160,0.18); }
+
+.jar-fluid {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  border-radius: 0 0 7px 7px;
+  animation: fluidOscillate 5s ease-in-out infinite;
+}
+
+@keyframes fluidOscillate {
+  0%,100% { height: var(--fh); }
+  50% { height: calc(var(--fh) + 4px); }
+}
+
+.jar.threat .jar-fluid { --fh: 45%; background: rgba(232,71,47,0.12); }
+.jar.warn   .jar-fluid { --fh: 38%; background: rgba(245,179,1,0.14); }
+.jar.info   .jar-fluid { --fh: 30%; background: rgba(107,63,160,0.1); }
+
+.jar-shine {
+  position: absolute;
+  top: 5px; left: 5px;
+  width: 3px; height: 24%;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.75);
+  z-index: 2;
+}
+
+.jar-critter {
+  position: relative; z-index: 3;
+  font-size: 1.2rem;
+  line-height: 1;
+  animation: gentleSway 3.5s ease-in-out infinite;
+  user-select: none;
+  filter: saturate(0.85);
+}
+
+.jar.warn .jar-critter { animation-delay: -1.2s; animation-duration: 4.2s; }
+.jar.info .jar-critter { animation-delay: -2.3s; animation-duration: 5s; }
+
+@keyframes gentleSway {
+  0%,100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg) translateY(-2px); }
+}
+
+.bbl {
+  position: absolute;
+  border-radius: 50%;
+  animation: bblRise linear infinite;
+  z-index: 1;
+}
+
+@keyframes bblRise {
+  0%   { transform: translateY(0); opacity: 0.4; }
+  100% { transform: translateY(-60px); opacity: 0; }
+}
+
+.jar.threat .bbl { background: rgba(232,71,47,0.35); }
+.jar.warn   .bbl { background: rgba(245,179,1,0.45); }
+.jar.info   .bbl { background: rgba(107,63,160,0.3); }
+
+.jar-meta { margin-top: 0.45rem; text-align: center; width: 100%; }
+
+.jar-meta-url {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.46rem;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: 100%;
+}
+
+.jar-meta-type {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-top: 0.12rem;
+}
+
+.jar.threat .jar-meta-type { color: var(--coral); }
+.jar.warn   .jar-meta-type { color: #a06800; }
+.jar.info   .jar-meta-type { color: var(--violet); }
+
+/* ===== CALLOUTS ===== */
+.callout-row {
+  display: flex; align-items: flex-start; gap: 0.7rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--border-md);
+}
+
+.callout-mark {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border-md);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.5rem;
+  color: var(--muted);
+  flex-shrink: 0;
+  margin-top: 1px;
+  background: rgba(255,255,255,0.8);
+}
+
+.callout-text {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.callout-text strong {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+/* ===== ACTIVITY LOG ===== */
+.log-body { padding: 0; max-height: 250px; overflow-y: auto; }
+.log-body::-webkit-scrollbar { width: 3px; }
+.log-body::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 999px; }
+
+.log-row {
+  display: flex; align-items: flex-start; gap: 0.8rem;
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  animation: rowIn 0.3s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes rowIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
+.log-row:last-child { border-bottom: none; }
+
+.log-tag { flex-shrink: 0; margin-top: 4px; }
+.log-tag-inner { width: 6px; height: 6px; border-radius: 50%; }
+.log-tag-inner.threat { background: var(--coral); }
+.log-tag-inner.safe   { background: var(--teal); }
+.log-tag-inner.warn   { background: var(--yellow); }
+.log-tag-inner.info   { background: var(--violet); }
+
+.log-body-text {
+  font-size: 0.74rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+  flex: 1;
+}
+
+.log-body-text .hi-coral  { color: var(--coral);  font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; }
+.log-body-text .hi-teal   { color: var(--teal);   font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; }
+.log-body-text .hi-yellow { color: #a06800;        font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; }
+
+.log-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--faint);
+  margin-top: 0.18rem;
+}
+
+/* ===== RIGHT — STATS ===== */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  padding: 1rem;
+}
+
+.stat {
+  background: rgba(255,255,255,0.55);
+  border-radius: 10px;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+.stat-n {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  margin-bottom: 0.25rem;
+}
+
+.stat-n.coral  { color: var(--coral); }
+.stat-n.teal   { color: var(--teal); }
+.stat-n.yellow { color: #c47a00; }
+.stat-n.violet { color: var(--violet); }
+
+.stat-l {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.stat-ann {
+  position: absolute;
+  top: 0.6rem; right: 0.65rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.47rem;
+  color: var(--faint);
+}
+
+/* ===== EXTENSION ===== */
+.ext-wrap { padding: 1rem; }
+
+.ext-chrome {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.65);
+}
+
+.ext-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(247,247,245,0.65);
+}
+
+.ext-dots { display: flex; gap: 4px; }
+.ext-dot { width: 7px; height: 7px; border-radius: 50%; }
+.ext-dot.r { background: rgba(232,71,47,0.45); }
+.ext-dot.y { background: rgba(245,179,1,0.7); }
+.ext-dot.g { background: rgba(10,140,122,0.45); }
+
+.ext-title {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--muted);
+  flex: 1;
+  text-align: center;
+}
+
+.ext-rows { padding: 0.6rem; display: flex; flex-direction: column; gap: 0.38rem; }
+
+.ext-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(255,255,255,0.7);
+  transition: background 0.12s;
+}
+
+.ext-icon { font-size: 0.78rem; width: 18px; text-align: center; }
+
+.ext-url {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--ink-2);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== RADAR ===== */
+.radar-wrap {
+  padding: 1rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.9rem;
+}
+
+.radar-field {
+  position: relative;
+  width: 150px; height: 150px;
+  flex-shrink: 0;
+}
+
+.radar-rings { position: absolute; inset: 0; }
+
+.radar-sweep {
+  position: absolute; inset: 0;
+  animation: radarSpin 7s linear infinite;
+  transform-origin: 75px 75px;
+}
+
+@keyframes radarSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.radar-legend {
+  width: 100%;
+  display: flex; flex-direction: column; gap: 0.4rem;
+}
+
+.leg-row { display: flex; align-items: center; justify-content: space-between; }
+
+.leg-left {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+.leg-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+.leg-right {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+/* ===== FOOTER ===== */
+footer {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.footer-l {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.footer-r {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+}
+
+/* Yellow accent bar on active card */
+.card-accent {
+  height: 3px;
+  background: linear-gradient(90deg, var(--yellow), rgba(245,179,1,0.3));
+  margin: 0;
+}
+
+</style>
+</head>
+<body>
+
+<!-- Gaussian gradient mesh -->
+<div class="bg-canvas">
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+  <div class="bg-orb orb-4"></div>
+  <div class="bg-orb orb-5"></div>
+</div>
+<div class="bg-noise"></div>
+
+<div class="app">
+
+  <header>
+    <div class="wordmark">
+      <div class="wordmark-icon">🏖</div>
+      <span class="wordmark-name">Sandcastle</span>
+      <span class="wordmark-badge">v0.3.1</span>
+    </div>
+    <div class="header-right">
+      <div class="header-meta">
+        <div>Uptime <strong>14h 32m</strong></div>
+        <div>Container <strong>#7</strong></div>
+        <div>Cleared <strong>241</strong></div>
+      </div>
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        Active scan
+      </div>
+    </div>
+  </header>
+
+  <div class="main-grid">
+
+    <!-- LEFT -->
+    <div class="left-col">
+
+      <!-- SCANNER -->
+      <div class="card">
+        <div class="card-accent"></div>
+        <div class="card-head">
+          <div class="card-label">
+            <div class="card-label-dot"></div>
+            Live URL Inspector
+          </div>
+          <div class="card-count threat">threat detected</div>
+        </div>
+        <div class="scanner-body">
+
+          <div class="scan-active">
+            <div class="scan-thumb">🚨</div>
+            <div class="scan-info">
+              <div class="scan-url">
+                <span class="scheme">https://</span><span class="domain">malware-as-kitten.ru</span>/download/definitely_not_bad.exe
+              </div>
+              <div class="scan-sub">intercepted from browser tab · sandboxed · 2s ago</div>
+            </div>
+            <div class="chip threat">blocked</div>
+          </div>
+
+          <div class="metrics">
+            <div class="metric">
+              <div class="ann"><span class="ann-line"></span>/ 100</div>
+              <div class="metric-label">Malware score</div>
+              <div class="metric-val bad">94</div>
+              <div class="metric-bar"><div class="metric-fill fill-coral" style="width:94%"></div></div>
+            </div>
+            <div class="metric">
+              <div class="ann"><span class="ann-line"></span>/ 100</div>
+              <div class="metric-label">Phishing prob.</div>
+              <div class="metric-val warn">72</div>
+              <div class="metric-bar"><div class="metric-fill fill-yellow" style="width:72%"></div></div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Domain age</div>
+              <div class="metric-val bad" style="font-size:1.2rem">2 days</div>
+              <div class="metric-bar"><div class="metric-fill fill-coral" style="width:5%"></div></div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Reputation</div>
+              <div class="metric-val ok" style="font-size:1.1rem">—</div>
+              <div class="metric-bar"><div class="metric-fill fill-teal" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <div class="section-ann">
+            <div class="section-ann-line"></div>
+            <div class="section-ann-label">pending queue — 3 items</div>
+            <div class="section-ann-line"></div>
+          </div>
+
+          <div class="queue">
+            <div class="q-row">
+              <span class="q-num">01</span>
+              <span class="q-url">github.com/openai/whisper/releases/download/v3/model.pt</span>
+              <div class="chip scan">scanning</div>
+            </div>
+            <div class="q-row">
+              <span class="q-num">02</span>
+              <span class="q-url">cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js</span>
+              <div class="chip" style="color:var(--faint);background:rgba(247,247,245,0.8);border:1px solid var(--border);font-size:0.62rem;font-weight:600;padding:0.18rem 0.6rem;border-radius:999px;">queued</div>
+            </div>
+            <div class="q-row">
+              <span class="q-num">03</span>
+              <span class="q-url">totally-legit-bank-login.xyz/verify?token=abc123</span>
+              <div class="chip warn">flagged</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- CONTAINMENT CHAMBER -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-label">
+            <div class="card-label-dot"></div>
+            Containment Chamber
+          </div>
+          <div class="card-count threat">6 specimens</div>
+        </div>
+        <div class="specimens-body">
+          <div class="spec-intro">
+            <div class="spec-intro-text">Isolated & quarantined for behavioral analysis</div>
+            <div class="spec-intro-count">session #7</div>
+          </div>
+
+          <div class="jars-grid">
+            <div class="jar threat">
+              <div class="jar-lid"></div>
+              <div class="jar-body">
+                <div class="jar-fluid"></div>
+                <div class="jar-shine"></div>
+                <div class="bbl" style="width:4px;height:4px;left:30%;bottom:12%;animation-duration:2.3s;animation-delay:0s;"></div>
+                <div class="bbl" style="width:3px;height:3px;left:58%;bottom:18%;animation-duration:1.8s;animation-delay:0.7s;"></div>
+                <div class="jar-critter">🦠</div>
+              </div>
+              <div class="jar-meta">
+                <span class="jar-meta-url">malware.ru</span>
+                <div class="jar-meta-type">Malware</div>
+              </div>
+            </div>
+            <div class="jar warn">
+              <div class="jar-lid"></div>
+              <div class="jar-body">
+                <div class="jar-fluid"></div>
+                <div class="jar-shine"></div>
+                <div class="bbl" style="width:3px;height:3px;left:45%;bottom:14%;animation-duration:2.7s;animation-delay:0.4s;"></div>
+                <div class="jar-critter">🐛</div>
+              </div>
+              <div class="jar-meta">
+                <span class="jar-meta-url">adtrack.io</span>
+                <div class="jar-meta-type">Tracker</div>
+              </div>
+            </div>
+            <div class="jar threat">
+              <div class="jar-lid"></div>
+              <div class="jar-body">
+                <div class="jar-fluid"></div>
+                <div class="jar-shine"></div>
+                <div class="bbl" style="width:5px;height:5px;left:28%;bottom:20%;animation-duration:2s;animation-delay:0.2s;"></div>
+                <div class="bbl" style="width:3px;height:3px;left:62%;bottom:12%;animation-duration:2.5s;animation-delay:0.9s;"></div>
+                <div class="jar-critter">🕷️</div>
+              </div>
+              <div class="jar-meta">
+                <span class="jar-meta-url">phish-login.xyz</span>
+                <div class="jar-meta-type">Phishing</div>
+              </div>
+            </div>
+            <div class="jar info">
+              <div class="jar-lid"></div>
+              <div class="jar-body">
+                <div class="jar-fluid"></div>
+                <div class="jar-shine"></div>
+                <div class="bbl" style="width:3px;height:3px;left:40%;bottom:15%;animation-duration:3.1s;animation-delay:0.5s;"></div>
+                <div class="jar-critter">🐞</div>
+              </div>
+              <div class="jar-meta">
+                <span class="jar-meta-url">cdn.suspicious.net</span>
+                <div class="jar-meta-type">Unknown CDN</div>
+              </div>
+            </div>
+            <div class="jar warn">
+              <div class="jar-lid"></div>
+              <div class="jar-body">
+                <div class="jar-fluid"></div>
+                <div class="jar-shine"></div>
+                <div class="bbl" style="width:4px;height:4px;left:50%;bottom:16%;animation-duration:2.4s;animation-delay:0.6s;"></div>
+                <div class="jar-critter">🦟</div>
+              </div>
+              <div class="jar-meta">
+                <span class="jar-meta-url">cookie-harvest.co</span>
+                <div class="jar-meta-type">Cookie Steal</div>
+              </div>
+            </div>
+            <div class="jar threat">
+              <div class="jar-lid"></div>
+              <div class="jar-body">
+                <div class="jar-fluid"></div>
+                <div class="jar-shine"></div>
+                <div class="bbl" style="width:3px;height:3px;left:35%;bottom:13%;animation-duration:2.1s;animation-delay:0.3s;"></div>
+                <div class="bbl" style="width:4px;height:4px;left:65%;bottom:22%;animation-duration:2.8s;animation-delay:1s;"></div>
+                <div class="jar-critter">🐍</div>
+              </div>
+              <div class="jar-meta">
+                <span class="jar-meta-url">pypi-typosquat.io</span>
+                <div class="jar-meta-type">Supply Chain</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="callout-row">
+            <div class="callout-mark">①</div>
+            <div class="callout-text">Each specimen is <strong>network-isolated</strong> inside Container #7 and executed in a sandboxed VM. Behavioral telemetry streams back for analysis.</div>
+          </div>
+          <div class="callout-row" style="margin-top:0.6rem;padding-top:0.75rem;">
+            <div class="callout-mark">②</div>
+            <div class="callout-text">Fluid level indicates <strong>confidence score</strong> — higher fluid means stronger signal for that threat class.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ACTIVITY LOG -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-label">
+            <div class="card-label-dot"></div>
+            Activity Log
+          </div>
+          <div class="card-count">live</div>
+        </div>
+        <div class="log-body">
+          <div class="log-row" style="animation-delay:0s">
+            <div class="log-tag"><div class="log-tag-inner threat"></div></div>
+            <div>
+              <div class="log-body-text">Download blocked from <span class="hi-coral">malware.ru</span> — executable matched 14 threat signatures in YARA scan</div>
+              <div class="log-time">just now</div>
+            </div>
+          </div>
+          <div class="log-row" style="animation-delay:0.07s">
+            <div class="log-tag"><div class="log-tag-inner warn"></div></div>
+            <div>
+              <div class="log-body-text">Redirect chain flagged: <span class="hi-yellow">5 hops</span> detected before reaching download endpoint — unusual pattern</div>
+              <div class="log-time">12s ago</div>
+            </div>
+          </div>
+          <div class="log-row" style="animation-delay:0.14s">
+            <div class="log-tag"><div class="log-tag-inner safe"></div></div>
+            <div>
+              <div class="log-body-text">Link intercepted by extension — <span class="hi-teal">github.com</span> verified clean, routed to sandbox for behavioral replay</div>
+              <div class="log-time">38s ago</div>
+            </div>
+          </div>
+          <div class="log-row" style="animation-delay:0.21s">
+            <div class="log-tag"><div class="log-tag-inner threat"></div></div>
+            <div>
+              <div class="log-body-text">Credential harvest form detected at <span class="hi-coral">phish-login.xyz</span> — page fingerprint matches known phishing kit</div>
+              <div class="log-time">1m 12s ago</div>
+            </div>
+          </div>
+          <div class="log-row" style="animation-delay:0.28s">
+            <div class="log-tag"><div class="log-tag-inner safe"></div></div>
+            <div>
+              <div class="log-body-text">Behavioral analysis complete — <span class="hi-teal">cdn.jsdelivr.net</span> asset verified clean, no exfiltration attempts recorded</div>
+              <div class="log-time">14h ago</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-col">
+
+      <!-- STATS -->
+      <div class="card">
+        <div class="card-accent"></div>
+        <div class="card-head">
+          <div class="card-label"><div class="card-label-dot"></div>Session Stats</div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat">
+            <div class="stat-ann">threats</div>
+            <div class="stat-n coral">18</div>
+            <div class="stat-l">Blocked</div>
+          </div>
+          <div class="stat">
+            <div class="stat-ann">cleared</div>
+            <div class="stat-n teal">241</div>
+            <div class="stat-l">Safe</div>
+          </div>
+          <div class="stat">
+            <div class="stat-ann">review</div>
+            <div class="stat-n yellow">7</div>
+            <div class="stat-l">Flagged</div>
+          </div>
+          <div class="stat">
+            <div class="stat-ann">pending</div>
+            <div class="stat-n violet">3</div>
+            <div class="stat-l">Queued</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RADAR -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-label"><div class="card-label-dot"></div>Threat Radar</div>
+        </div>
+        <div class="radar-wrap">
+          <div class="radar-field">
+            <svg class="radar-rings" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="75" cy="75" r="68" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+              <circle cx="75" cy="75" r="48" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+              <circle cx="75" cy="75" r="28" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
+              <line x1="75" y1="7" x2="75" y2="143" stroke="rgba(0,0,0,0.05)" stroke-width="1"/>
+              <line x1="7" y1="75" x2="143" y2="75" stroke="rgba(0,0,0,0.05)" stroke-width="1"/>
+              <circle cx="108" cy="42" r="3.5" fill="#e8472f" opacity="0.8"/>
+              <circle cx="52" cy="98" r="3"   fill="#f5b301" opacity="0.8"/>
+              <circle cx="122" cy="88" r="3"  fill="#e8472f" opacity="0.7"/>
+              <circle cx="68" cy="48" r="2.5" fill="#f5b301" opacity="0.7"/>
+              <circle cx="108" cy="42" r="4" fill="none" stroke="#e8472f">
+                <animate attributeName="r" values="4;13" dur="2.2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.7;0" dur="2.2s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="52" cy="98" r="3" fill="none" stroke="#f5b301">
+                <animate attributeName="r" values="3;11" dur="2.2s" begin="-0.7s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.6;0" dur="2.2s" begin="-0.7s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="122" cy="88" r="3" fill="none" stroke="#e8472f">
+                <animate attributeName="r" values="3;11" dur="2.2s" begin="-1.4s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.6;0" dur="2.2s" begin="-1.4s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
+            <svg class="radar-sweep" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;width:100%;height:100%;">
+              <defs>
+                <radialGradient id="sg" cx="75" cy="75" r="68" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#f5b301" stop-opacity="0"/>
+                  <stop offset="100%" stop-color="#f5b301" stop-opacity="0.14"/>
+                </radialGradient>
+              </defs>
+              <path d="M75 75 L143 75 A68 68 0 0 0 75 7 Z" fill="url(#sg)"/>
+              <line x1="75" y1="75" x2="143" y2="75" stroke="#f5b301" stroke-width="1.5" opacity="0.5"/>
+            </svg>
+          </div>
+
+          <div class="radar-legend">
+            <div class="leg-row">
+              <div class="leg-left"><div class="leg-dot" style="background:var(--coral)"></div>Malware drops</div>
+              <div class="leg-right">12</div>
+            </div>
+            <div class="leg-row">
+              <div class="leg-left"><div class="leg-dot" style="background:var(--yellow)"></div>Trackers / PUPs</div>
+              <div class="leg-right">4</div>
+            </div>
+            <div class="leg-row">
+              <div class="leg-left"><div class="leg-dot" style="background:var(--violet)"></div>Suspicious CDNs</div>
+              <div class="leg-right">2</div>
+            </div>
+          </div>
+
+          <div style="width:100%;padding-top:0.7rem;border-top:1px dashed var(--border-md);display:flex;align-items:flex-start;gap:0.45rem;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--faint);margin-top:2px;">↳</div>
+            <div style="font-size:0.72rem;color:var(--muted);line-height:1.45;">Blips indicate live detections. Sweep rate: one rotation per 7 seconds.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- EXTENSION PREVIEW -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-label"><div class="card-label-dot"></div>Extension Preview</div>
+        </div>
+        <div class="ext-wrap">
+          <div class="ext-chrome">
+            <div class="ext-bar">
+              <div class="ext-dots">
+                <div class="ext-dot r"></div>
+                <div class="ext-dot y"></div>
+                <div class="ext-dot g"></div>
+              </div>
+              <div class="ext-title">Sandcastle Shield</div>
+            </div>
+            <div class="ext-rows">
+              <div class="ext-item">
+                <span class="ext-icon">🔗</span>
+                <span class="ext-url">github.com/user/repo</span>
+                <div class="chip safe">safe</div>
+              </div>
+              <div class="ext-item">
+                <span class="ext-icon">📥</span>
+                <span class="ext-url">model_weights_v2.bin</span>
+                <div class="chip scan">scanning</div>
+              </div>
+              <div class="ext-item">
+                <span class="ext-icon">⚠️</span>
+                <span class="ext-url">definitely-real-npm.io</span>
+                <div class="chip threat">blocked</div>
+              </div>
+              <div style="margin-top:0.2rem;padding:0.5rem 0.6rem;background:var(--teal-light);border-radius:7px;border:1px solid var(--teal-border);display:flex;align-items:center;gap:0.5rem;">
+                <div class="live-dot"></div>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--teal);font-weight:500;">Container #7 active</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:0.8rem;display:flex;align-items:flex-start;gap:0.45rem;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--faint);margin-top:3px;">↳</span>
+            <span style="font-size:0.72rem;color:var(--muted);line-height:1.45;">Every click and download is intercepted before reaching the OS. Results stream back in real time.</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-l">All interactions contained. Nothing escapes the sandbox.</div>
+    <div class="footer-r">SANDCASTLE · AI SAFETY RESEARCH · CONTAINER #7</div>
+  </footer>
+
+</div>
+</body>
+</html>

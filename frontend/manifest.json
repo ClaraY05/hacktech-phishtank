@@ -17,7 +17,13 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/content/helper/styles.css"],
+      "resources": [
+        "src/content/styles/index.css",
+        "src/content/styles/tokens.css",
+        "src/content/styles/link-highlight.css",
+        "src/content/styles/tooltip.css",
+        "src/content/styles/badge.css"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

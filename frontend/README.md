@@ -8,14 +8,31 @@ Manifest V3 Chrome extension scaffold for AI Safe Link Sandbox.
 - `src/content/index.ts`: content-script orchestration entrypoint.
 - `src/content/helper/linkScanner.ts`: link recognition + link payload shaping.
 - `src/content/helper/sanitizer.ts`: DOM signal extraction + HTML sanitization/truncation.
-- `src/content/helper/styling.ts`: stylesheet injection and link class highlighting.
-- `src/content/helper/styles.css`: class-based link highlight styles.
+- `src/content/helper/styling.ts`: thin facade for content UI orchestration exports.
+- `src/content/helper/styleLoader.ts`: runtime CSS loader/injection for content UI.
+- `src/content/helper/featureState.ts`: global bubble/activation state management.
+- `src/content/helper/tooltipController.ts`: tooltip lifecycle and positioning.
+- `src/content/helper/badgeController.ts`: corner bubble rendering and state visuals.
+- `src/content/helper/linkBindings.ts`: link hover/focus bindings and mutation observer.
+- `src/content/helper/uiConstants.ts`: shared UI constants and bubble-state type.
+- `src/content/styles/index.css`: content style entrypoint.
+- `src/content/styles/tokens.css`: shared content tokens/font import.
+- `src/content/styles/link-highlight.css`: link border/hover highlight styles.
+- `src/content/styles/tooltip.css`: tooltip styles.
+- `src/content/styles/badge.css`: badge animation/state styles.
+- `src/content/helper/styles.css`: compatibility wrapper that imports `src/content/styles/index.css`.
 - `src/content/helper/payloadBuilder.ts`: message payload formatting for background.
 - `src/content/helper/messages.ts`: content -> background messaging helper.
 - `src/background/index.ts`: thin message router.
 - `src/background/helper/apiClient.ts`: backend HTTP client for `/analyze-links`.
 - `src/popup/popup.html`: popup UI shell.
 - `src/popup/index.ts`: popup TypeScript entrypoint.
+- `src/popup/styles/index.css`: popup style entrypoint.
+- `src/popup/styles/tokens.css`: popup design tokens.
+- `src/popup/styles/layout.css`: popup layout/background/shell styles.
+- `src/popup/styles/cards.css`: popup card/status/metric styles.
+- `src/popup/styles/chips.css`: chip/status-pill styles.
+- `src/popup/styles/list.css`: recent-item list styles.
 
 ## Local Setup
 
@@ -68,7 +85,11 @@ Optional for faster iteration:
 - HTML sanitization logic: `src/content/helper/sanitizer.ts`
 - Link recognition and payload link extraction: `src/content/helper/linkScanner.ts`
 - Red-box class styling: `src/content/helper/styles.css`
-- Style injection/class application: `src/content/helper/styling.ts`
+- Style injection entrypoint: `src/content/helper/styleLoader.ts`
+- Link bind/highlight logic: `src/content/helper/linkBindings.ts`
+- Bubble state + activation: `src/content/helper/featureState.ts`
+- Badge rendering behavior: `src/content/helper/badgeController.ts`
+- Tooltip behavior: `src/content/helper/tooltipController.ts`
 - Backend payload shape before send: `src/content/helper/payloadBuilder.ts`
 - Content -> background send behavior: `src/content/helper/messages.ts`
 - Background -> backend request behavior: `src/background/helper/apiClient.ts`
