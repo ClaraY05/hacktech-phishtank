@@ -25,3 +25,5 @@ build/
 # IDE
 .idea/
 .vscode/
+
+*.egg-info/
