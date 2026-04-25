@@ -1,29 +1,51 @@
+import { postAnalyzeLinks } from "./helper/apiClient";
+
+const POPUP_WINDOW_WIDTH = 420;
+const POPUP_WINDOW_HEIGHT = 560;
+let popupWindowId: number | null = null;
+
+async function openOrFocusExtensionWindow(): Promise<void> {
+  if (popupWindowId !== null) {
+    try {
+      const existing = await chrome.windows.get(popupWindowId);
+      if (existing.id !== undefined) {
+        await chrome.windows.update(existing.id, { focused: true });
+        return;
+      }
+    } catch {
+      popupWindowId = null;
+    }
+  }
+
+  const popupUrl = chrome.runtime.getURL("src/popup/popup.html");
+  const created = await chrome.windows.create({
+    url: popupUrl,
+    type: "popup",
+    focused: true,
+    width: POPUP_WINDOW_WIDTH,
+    height: POPUP_WINDOW_HEIGHT,
+  });
+
+  popupWindowId = created.id ?? null;
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log("AI Safe Link extension installed.");
 });
 
+chrome.action.onClicked.addListener(() => {
+  void openOrFocusExtensionWindow();
+});
+
+chrome.windows.onRemoved.addListener((windowId) => {
+  if (popupWindowId === windowId) {
+    popupWindowId = null;
+  }
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "ANALYZE_LINKS") {
-    fetch("http://127.0.0.1:8000/analyze-links", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        page_url: message.pageUrl,
-        links: message.links,
-        dom_signals: message.domSignals,
-        sanitized_html_excerpt: message.sanitizedHtmlExcerpt,
-        content_hash_hint: message.contentHashHint,
-      }),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`Backend HTTP ${response.status}: ${text}`);
-        }
-        return response.json();
-      })
+    postAnalyzeLinks(message)
       .then((data) => {
         sendResponse({ ok: true, data });
       })

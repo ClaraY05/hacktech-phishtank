@@ -6,8 +6,7 @@
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>", "http://127.0.0.1:8000/*", "http://localhost:8000/*"],
   "background": {
-    "service_worker": "dist/background/index.js",
-    "type": "module"
+    "service_worker": "dist/background/index.js"
   },
   "content_scripts": [
     {
@@ -16,8 +15,19 @@
       "run_at": "document_idle"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/styles/index.css",
+        "src/content/styles/tokens.css",
+        "src/content/styles/link-highlight.css",
+        "src/content/styles/tooltip.css",
+        "src/content/styles/badge.css"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
-    "default_title": "AI Safe Link",
-    "default_popup": "src/popup/popup.html"
+    "default_title": "AI Safe Link"
   }
 }
