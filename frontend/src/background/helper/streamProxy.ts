@@ -2,6 +2,8 @@
 // so the content script can avoid Chrome's Local Network Access block on
 // page-origin -> 127.0.0.1 fetches.
 
+import { geminiRateLimiter } from "./rateLimiter";
+
 export type StreamPayload = {
   pageUrl: string;
   links: { url: string; text: string }[];
@@ -17,6 +19,14 @@ export async function streamBatchToCallback(
   onResult: (result: Record<string, unknown>) => void,
   signal: AbortSignal,
 ): Promise<void> {
+  // Hard cap on outbound rate so we never trip Gemini's free-tier 15 RPM
+  // ceiling, even under aggressive hovering across many tabs. The bucket
+  // is shared globally in the SW.
+  await geminiRateLimiter.acquire();
+  if (signal.aborted) {
+    throw new DOMException("aborted", "AbortError");
+  }
+
   const response = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
