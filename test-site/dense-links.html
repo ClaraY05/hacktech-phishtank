@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dense links — AI Safe Link test</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 1rem;
+      }
+      .scrollbox {
+        height: 70vh;
+        overflow: auto;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        background: #fafafa;
+      }
+      a {
+        display: block;
+        padding: 0.35rem 0;
+        color: #0b57d0;
+      }
+      p.meta {
+        max-width: 40rem;
+        font-size: 0.9rem;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="meta">
+      <a href="index.html">← Index</a> — Scroll inside the box; each row is a
+      separate anchor (same safe URL, different link text) to exercise hover +
+      scroll behavior.
+    </p>
+    <div class="scrollbox" id="list"></div>
+    <script>
+      const box = document.getElementById("list");
+      const frag = document.createDocumentFragment();
+      for (let i = 1; i <= 120; i++) {
+        const a = document.createElement("a");
+        a.href = "https://example.com/path?n=" + i;
+        a.textContent = "Example destination — item " + i;
+        frag.appendChild(a);
+      }
+      box.appendChild(frag);
+    </script>
+  </body>
+</html>

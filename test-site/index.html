@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Safe Link — test site</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 42rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      a {
+        color: #0b57d0;
+      }
+      .note {
+        background: #f3f4f6;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>AI Safe Link — test pages</h1>
+    <p class="note">
+      All pages are static and benign. “Scary” wording and fake login UI still
+      point only to <code>example.com</code>, same-origin anchors, or
+      <code>mailto:</code>/<code>tel:</code>.
+    </p>
+    <ul>
+      <li><a href="dense-links.html">Dense links (scroll stress)</a></li>
+      <li><a href="deceptive-labels.html">Deceptive labels (safe hrefs)</a></li>
+      <li><a href="edge-cases.html">Edge cases</a></li>
+    </ul>
+    <p><a href="https://example.com">External safe link (example.com)</a></p>
+  </body>
+</html>

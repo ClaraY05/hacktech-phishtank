@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deceptive labels — AI Safe Link test</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.5;
+      }
+      .urgent {
+        color: #b91c1c;
+        font-weight: 600;
+      }
+      a {
+        color: #0b57d0;
+      }
+      form {
+        margin-top: 2rem;
+        padding: 1rem;
+        border: 1px dashed #999;
+        border-radius: 8px;
+        max-width: 22rem;
+      }
+      label {
+        display: block;
+        margin: 0.5rem 0 0.15rem;
+        font-size: 0.85rem;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.4rem;
+      }
+    </style>
+  </head>
+  <body>
+    <p><a href="index.html">← Index</a></p>
+    <h1>Deceptive labels (benign targets)</h1>
+    <p class="urgent">Your account will be suspended in 24 hours!</p>
+    <p>
+      <a href="https://example.com/verify">Click here to verify your account now</a>
+    </p>
+    <p>
+      <a href="https://www.example.org/login">Sign in to your bank — secure portal</a>
+    </p>
+    <p>
+      <a href="https://example.com">https://totally-real-bank.example/</a>
+      (visible text lies; href is still example.com)
+    </p>
+    <p>
+      <a href="dense-links.html">Download invoice.pdf.exe</a>
+      (label sounds malicious; target is this test site)
+    </p>
+
+    <form action="#" method="get" autocomplete="off">
+      <strong>Fake “sign in” (does not submit anywhere useful)</strong>
+      <label for="u">Username</label>
+      <input id="u" name="u" type="text" placeholder="you@example.com" />
+      <label for="p">Password</label>
+      <input id="p" name="p" type="password" placeholder="••••••••" />
+      <p style="margin-top: 1rem">
+        <a href="https://example.com/post-login">Continue to account</a>
+      </p>
+    </form>
+  </body>
+</html>
