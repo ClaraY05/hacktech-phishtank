@@ -12,17 +12,92 @@ This service is intended to:
 
 ## Structure
 
-- `src/main.py`: FastAPI app with `/health` and `POST /analyze-link` routes.
+- `src/main.py`: FastAPI app with `/health`, `POST /analyze-link`,
+  `GET /cache/stats`, `POST /cache/invalidate` routes.
 - `src/k2_client.py`: K2 Think V2 async client (chat + streaming).
 - `src/gemma_client.py`: Gemma vision async client (Google AI Studio).
 - `src/sandbox.py`: Playwright headless-Chromium capture (screenshot +
-  redirect chain, popups, downloads, network, external domains).
+  redirect chain, popups, downloads, network, external domains, link
+  enumeration with URL-string suspicion scoring).
+- `src/sandbox_backend.py`: Pluggable sandbox-backend layer
+  (`InProcessBackend`, `PodmanBackend`, factory chosen by
+  `SANDBOX_BACKEND` env var).
+- `src/cache.py`: TTL + single-flight cache for analyzed verdicts.
 - `Dockerfile`, `setup.sh`: container image + host bootstrap for the
-  future Podman + gVisor sandbox (work-in-progress, see notes below).
+  Podman + gVisor sandbox (selected at runtime via `SANDBOX_BACKEND=podman`).
 - `src/orchestrator.py`: Glue that runs the Gemma -> K2 pipeline and
   returns a unified risk response.
 - `tests/`: backend test scaffold.
 - `.env.example`: environment variable template for local setup.
+
+## Sandbox backend (pluggable)
+
+The `/analyze-link` route does not call Playwright directly. It calls
+whatever ``SandboxBackend`` was selected at startup via the
+``SANDBOX_BACKEND`` env var. The pipeline only depends on the backend
+returning a ``SandboxResult`` dict; how that dict is produced is the
+backend's problem.
+
+| `SANDBOX_BACKEND` | What runs | Host isolation |
+|---|---|---|
+| `inprocess` (default) | `sandbox.capture()` in the FastAPI process | Chromium renderer sandbox + per-request `BrowserContext` only |
+| `podman` | `podman run --rm [--runtime=runsc] safelink-sandbox <url>` | Linux namespaces + cgroups + dropped caps + read-only rootfs + (with gVisor) syscall mediation |
+
+Switching is one env var. No code changes, same wire format
+(`SandboxResult` JSON), same orchestrator. To add a different isolation
+strategy later (long-running sandbox worker over HTTP, remote sandbox
+service, etc.), implement the ``SandboxBackend`` protocol in
+`src/sandbox_backend.py` and add it to ``get_backend()``.
+
+### Podman backend tunables
+
+Defaults are deliberately strict; override per env var as needed:
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `SANDBOX_IMAGE` | `safelink-sandbox` | Container image tag |
+| `USE_RUNSC` | `1` | Add `--runtime=runsc` (gVisor) |
+| `SANDBOX_TIMEOUT_S` | `30` | Wall-clock cap per request |
+| `PODMAN_PATH` | autodetect | Override podman binary location |
+| `SANDBOX_NETWORK` | unset | Podman network name (use a restrictive CNI to block LAN egress) |
+| `SANDBOX_MEMORY` | `1g` | cgroup memory cap |
+| `SANDBOX_CPUS` | `1.0` | cgroup CPU cap |
+| `SANDBOX_PIDS_LIMIT` | `200` | Fork-bomb guard |
+| `SANDBOX_TMPFS_SIZE` | `200m` | Writable scratch size |
+
+## Verdict cache
+
+Every browser-extension hover hits `/analyze-link`. To make that
+affordable, results are cached by canonicalized URL with an in-process
+TTL cache plus single-flight coalescing:
+
+| Behavior | Effect |
+|---|---|
+| Cached hit | Returns instantly, response includes `"_cache": "hit"` |
+| First request for a URL | Runs the full pipeline, response includes `"_cache": "miss"` |
+| Concurrent requests for the same URL | Only one runs the pipeline; others await its future. All get `"_cache": "coalesced"` |
+| `force_refresh: true` in the request body | Bypasses cache and re-runs |
+
+URL canonicalization (in `cache.canonicalize_url`): lowercase scheme +
+host, strip default ports and the URL fragment, keep path + query as-is.
+
+Tunable via env:
+
+- `ANALYSIS_CACHE_MAX` (default `10000`)
+- `ANALYSIS_CACHE_TTL_S` (default `3600`)
+
+Inspection / control:
+
+```bash
+curl http://localhost:8000/cache/stats
+curl -X POST http://localhost:8000/cache/invalidate \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/"}'
+```
+
+For multi-worker uvicorn deployments, swap the in-process `TTLCache`
+inside `cache.AnalysisCache` for a Redis-backed implementation; the
+`AnalysisCache` interface stays the same.
 
 ## Setup
 
