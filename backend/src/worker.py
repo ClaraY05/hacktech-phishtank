@@ -15,7 +15,7 @@ Two design choices deliberately match what the host expects:
   ``screenshot_b64`` could be produced (the host treats that as a
   ``CaptureError``); zero exit otherwise, even if the SandboxResult
   contains a soft ``error`` field (e.g. nav timeout but we still got a
-  partial DOM dump).
+  partial DOM dump).fewfwe
 """
 
 from __future__ import annotations
