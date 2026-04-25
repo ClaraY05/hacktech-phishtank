@@ -1,78 +1,52 @@
 import { discoverLinks, buildLinkPayload } from "./helper/linkScanner";
 import { collectDomSignals, sanitizeHtmlForAnalysis } from "./helper/sanitizer";
 import {
-  applyLinkTooltips,
   getBubbleState,
   highlightLinks,
   initializeFeatureActivationState,
   setBadgeAnalyzing,
   showBadge,
 } from "./helper/styling";
-import { buildAnalyzePayload } from "./helper/payloadBuilder";
-import { sendAnalyzeLinksMessage } from "./helper/messages";
+import { streamBatchAnalysis, scoreToRating, type LinkAnalysisResult } from "./helper/batchStream";
+import { TOOLTIP_ATTR, RISK_ATTR, RISK_LOW, RISK_MEDIUM, RISK_HIGH } from "./helper/uiConstants";
 
 const MAX_HTML_CHARS = 200_000;
 const MAX_LINKS = 500;
 const FALLBACK_TOOLTIP_TEXT = "AI Safe Link: no analysis details available yet.";
 const ANALYZING_TOOLTIP_TEXT = "analysis in progress";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+function riskClass(result: LinkAnalysisResult): string {
+  if (result.risk === "HIGH") return RISK_HIGH;
+  if (result.risk === "MEDIUM") return RISK_MEDIUM;
+  if (result.risk === "LOW") return RISK_LOW;
+  const rating = scoreToRating(result.score);
+  if (rating <= 3) return RISK_HIGH;
+  if (rating <= 7) return RISK_MEDIUM;
+  return RISK_LOW;
 }
 
-function extractTooltipText(entry: unknown): string | undefined {
-  if (typeof entry === "string") {
-    return entry;
+function applyResultToLinks(
+  result: LinkAnalysisResult,
+  linksByUrl: Map<string, HTMLAnchorElement[]>,
+): void {
+  const links = linksByUrl.get(result.url) ?? [];
+  const tooltipText = result.explanation || FALLBACK_TOOLTIP_TEXT;
+  const rc = riskClass(result);
+  for (const link of links) {
+    link.setAttribute(TOOLTIP_ATTR, tooltipText);
+    link.setAttribute(RISK_ATTR, rc);
+    link.removeAttribute("title");
   }
-
-  if (!isRecord(entry)) {
-    return undefined;
-  }
-
-  const textFields = [
-    "tooltip",
-    "description",
-    "explanation",
-    "reason",
-    "summary",
-    "risk_label",
-    "verdict",
-  ];
-
-  for (const field of textFields) {
-    const value = entry[field];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value;
-    }
-  }
-
-  const riskScore = entry.risk_score;
-  if (typeof riskScore === "number") {
-    return `Risk score: ${riskScore}`;
-  }
-
-  return undefined;
 }
 
-function extractTooltipTextsFromResponse(data: unknown, expectedCount: number): string[] {
-  const directList = Array.isArray(data) ? data : undefined;
-  const wrappedList =
-    isRecord(data) && Array.isArray(data.results)
-      ? data.results
-      : isRecord(data) && Array.isArray(data.links)
-        ? data.links
-        : isRecord(data) && Array.isArray(data.analyses)
-          ? data.analyses
-          : isRecord(data) && Array.isArray(data.items)
-            ? data.items
-            : undefined;
-
-  const entries = directList ?? wrappedList;
-  if (!entries) {
-    return [];
+function buildLinksByUrl(links: HTMLAnchorElement[]): Map<string, HTMLAnchorElement[]> {
+  const map = new Map<string, HTMLAnchorElement[]>();
+  for (const link of links) {
+    const url = link.href;
+    if (!map.has(url)) map.set(url, []);
+    map.get(url)!.push(link);
   }
-
-  return entries.slice(0, expectedCount).map((entry) => extractTooltipText(entry) || FALLBACK_TOOLTIP_TEXT);
+  return map;
 }
 
 async function runContentFlow(): Promise<void> {
@@ -91,7 +65,9 @@ async function runContentFlow(): Promise<void> {
   }
 
   if (bubbleState === "analyzing") {
-    applyLinkTooltips(discoveredLinks, [], ANALYZING_TOOLTIP_TEXT);
+    for (const link of discoveredLinks) {
+      link.setAttribute(TOOLTIP_ATTR, ANALYZING_TOOLTIP_TEXT);
+    }
     return;
   }
 
@@ -102,23 +78,30 @@ async function runContentFlow(): Promise<void> {
   console.log(`AI Safe Link found ${payloadLinks.length} links on page`);
   const domSignals = collectDomSignals(document);
   const sanitizedHtmlExcerpt = sanitizeHtmlForAnalysis(document, MAX_HTML_CHARS);
-  const message = buildAnalyzePayload({
-    pageUrl: window.location.href,
-    links: payloadLinks,
-    domSignals,
-    sanitizedHtmlExcerpt,
-  });
+  const linksByUrl = buildLinksByUrl(discoveredLinks);
 
   setBadgeAnalyzing(true);
-  const response = await sendAnalyzeLinksMessage(message);
-  setBadgeAnalyzing(false);
-  if (!response.ok) {
-    applyLinkTooltips(discoveredLinks, [], FALLBACK_TOOLTIP_TEXT);
-    return;
+  try {
+    await streamBatchAnalysis(
+      {
+        pageUrl: window.location.href,
+        links: payloadLinks,
+        domSignals,
+        sanitizedHtmlExcerpt,
+        contentHashHint: `${window.location.hostname}:${payloadLinks.length}:${sanitizedHtmlExcerpt.length}`,
+      },
+      (result) => applyResultToLinks(result, linksByUrl),
+    );
+  } catch (err) {
+    console.error("AI Safe Link: batch analysis failed", err);
+    for (const link of discoveredLinks) {
+      if (!link.getAttribute(TOOLTIP_ATTR)) {
+        link.setAttribute(TOOLTIP_ATTR, FALLBACK_TOOLTIP_TEXT);
+      }
+    }
+  } finally {
+    setBadgeAnalyzing(false);
   }
-
-  const tooltipTexts = extractTooltipTextsFromResponse(response.data, discoveredLinks.length);
-  applyLinkTooltips(discoveredLinks, tooltipTexts, FALLBACK_TOOLTIP_TEXT);
 }
 
 void runContentFlow();

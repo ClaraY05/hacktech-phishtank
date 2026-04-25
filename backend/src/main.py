@@ -17,6 +17,7 @@ Both the sandbox backend and the cache are pluggable. See
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -24,8 +25,10 @@ from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, HttpUrl
 
+from batch_processor import process_links_stream
 from cache import AnalysisCache, canonicalize_url
 from gemma_client import GemmaClient
 from k2_client import K2Client
@@ -135,40 +138,38 @@ def cache_invalidate(payload: InvalidateRequest) -> dict[str, Any]:
 
 
 @app.post("/send-batch-links")
-def send_batch_links(payload: AnalyzeLinksRequest) -> dict:
-    # logger.info("=== /send-batch-links received ===")
-    # logger.info("  page_url=%s", payload.page_url)
-    # logger.info("  link_count=%d  unique=%d", len(payload.links), len(set(str(l.url) for l in payload.links)))
-    # logger.info("  dom_signals=%s", payload.dom_signals)
-    # logger.info("  html_chars=%d  content_hash_hint=%s", len(payload.sanitized_html_excerpt or ""), payload.content_hash_hint)
-    # for i, link in enumerate(payload.links):
-    #     logger.info("  [%d] url=%s  text=%r", i, link.url, link.text)
+async def send_batch_links(payload: AnalyzeLinksRequest) -> StreamingResponse:
+    logger.info("=== /send-batch-links received ===")
+    logger.info("  page_url=%s", payload.page_url)
+    logger.info("  link_count=%d  unique=%d", len(payload.links), len(set(str(l.url) for l in payload.links)))
+    logger.info("  dom_signals=%s", payload.dom_signals)
+    logger.info("  html_chars=%d  content_hash_hint=%s", len(payload.sanitized_html_excerpt or ""), payload.content_hash_hint)
+    for i, link in enumerate(payload.links):
+        logger.info("  [%d] url=%s  text=%r", i, link.url, link.text)
 
     unique_urls = list(dict.fromkeys(str(link.url) for link in payload.links))
-    dom_signals = payload.dom_signals or {}
-    html_excerpt = payload.sanitized_html_excerpt or ""
 
-    results = [
-        {
-            "url": url,
-            "risk": "UNKNOWN",
-            "score": 0,
-            "explanation": "Scaffold response. K2 reasoning not wired yet.",
-            "redirect_chain": [url],
-        }
-        for url in unique_urls
-    ]
+    try:
+        gemma = _get_gemma_client()
+        k2 = _get_k2_client()
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return {
-        "ok": True,
-        "page_url": str(payload.page_url),
-        "total_links": len(payload.links),
-        "unique_links": len(unique_urls),
-        "received_dom_signals": dom_signals,
-        "received_html_chars": len(html_excerpt),
-        "received_content_hash_hint": payload.content_hash_hint,
-        "results": results,
-    }
+    backend: SandboxBackend = app.state.sandbox_backend
+    cache: AnalysisCache = app.state.cache
+
+    async def event_stream():
+        async for result in process_links_stream(
+            unique_urls,
+            backend=backend,
+            cache=cache,
+            gemma=gemma,
+            k2=k2,
+        ):
+            yield f"data: {json.dumps(result)}\n\n"
+        yield 'data: {"done": true}\n\n'
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.post("/analyze-link")
