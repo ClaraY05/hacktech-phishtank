@@ -1,6 +1,11 @@
 import { discoverLinks, buildLinkPayload } from "./helper/linkScanner";
 import { collectDomSignals, sanitizeHtmlForAnalysis } from "./helper/sanitizer";
-import { applyLinkTooltips, highlightLinks, showBadge } from "./helper/styling";
+import {
+  applyLinkTooltips,
+  highlightLinks,
+  initializeFeatureActivationState,
+  showBadge,
+} from "./helper/styling";
 import { buildAnalyzePayload } from "./helper/payloadBuilder";
 import { sendAnalyzeLinksMessage } from "./helper/messages";
 
@@ -69,6 +74,7 @@ function extractTooltipTextsFromResponse(data: unknown, expectedCount: number): 
 
 async function runContentFlow(): Promise<void> {
   console.log("AI Safe Link content script injected", window.location.href);
+  await initializeFeatureActivationState();
 
   const discoveredLinks = discoverLinks(document);
   await highlightLinks(discoveredLinks);
