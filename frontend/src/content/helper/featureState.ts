@@ -12,7 +12,23 @@ let activationStateInitialized = false;
 let bubbleState: BubbleState = "enabled";
 let onStateChange: (() => void) | null = null;
 
+function emitUiStateChange(): void {
+  chrome.runtime.sendMessage(
+    {
+      type: "UI_STATE_CHANGE",
+      state: bubbleState,
+    },
+    () => {
+      // Ignore failures when background is unavailable.
+      if (chrome.runtime.lastError) {
+        return;
+      }
+    },
+  );
+}
+
 function notifyStateChange(): void {
+  emitUiStateChange();
   onStateChange?.();
 }
 
@@ -83,7 +99,7 @@ export async function initializeFeatureActivationState(): Promise<boolean> {
       isFeatureActive = true;
     }
   } catch (error) {
-    console.warn("AI Safe Link: failed to read activation state", error);
+    console.warn("PhishTank: failed to read activation state", error);
     isFeatureActive = true;
   }
 
@@ -118,7 +134,7 @@ export async function setFeatureActivation(nextValue: boolean): Promise<void> {
   try {
     await chrome.storage.local.set({ [ACTIVATION_STORAGE_KEY]: nextValue });
   } catch (error) {
-    console.warn("AI Safe Link: failed to persist activation state", error);
+    console.warn("PhishTank: failed to persist activation state", error);
   }
 }
 

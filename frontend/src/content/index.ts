@@ -13,7 +13,7 @@ import { sendAnalyzeLinksMessage } from "./helper/messages";
 
 const MAX_HTML_CHARS = 200_000;
 const MAX_LINKS = 500;
-const FALLBACK_TOOLTIP_TEXT = "AI Safe Link: no analysis details available yet.";
+const FALLBACK_TOOLTIP_TEXT = "PhishTank: no analysis details available yet.";
 const ANALYZING_TOOLTIP_TEXT = "analysis in progress";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -76,7 +76,7 @@ function extractTooltipTextsFromResponse(data: unknown, expectedCount: number): 
 }
 
 async function runContentFlow(): Promise<void> {
-  console.log("AI Safe Link content script injected", window.location.href);
+  console.log("PhishTank content script injected", window.location.href);
   await initializeFeatureActivationState();
 
   const discoveredLinks = discoverLinks(document);
@@ -99,7 +99,7 @@ async function runContentFlow(): Promise<void> {
     return;
   }
 
-  console.log(`AI Safe Link found ${payloadLinks.length} links on page`);
+  console.log(`PhishTank found ${payloadLinks.length} links on page`);
   const domSignals = collectDomSignals(document);
   const sanitizedHtmlExcerpt = sanitizeHtmlForAnalysis(document, MAX_HTML_CHARS);
   const message = buildAnalyzePayload({

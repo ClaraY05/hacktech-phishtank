@@ -21,7 +21,7 @@ export async function ensureStylesInjected(): Promise<void> {
   linkEl.rel = "stylesheet";
   linkEl.href = cssUrl;
   linkEl.addEventListener("error", () => {
-    console.warn("AI Safe Link: stylesheet load failed, using fallback CSS");
+    console.warn("PhishTank: stylesheet load failed, using fallback CSS");
     if (document.getElementById(STYLE_ID)) {
       document.getElementById(STYLE_ID)?.remove();
     }
