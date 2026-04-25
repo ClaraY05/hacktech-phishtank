@@ -30,7 +30,40 @@ This service is intended to:
 uvicorn main:app --reload --app-dir src
 ```
 
-## K2 Think V2 Client
+## Current Extension Payload
+
+The extension now sends a hybrid payload to `POST /analyze-links`:
+
+- `page_url`: current page URL
+- `links`: discovered links (`url`, `text`)
+- `dom_signals`: extracted security signals (forms, iframes, suspicious keywords)
+- `sanitized_html_excerpt`: sanitized and truncated HTML snapshot
+- `content_hash_hint`: lightweight dedupe hint
+
+Example request:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/analyze-links" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "page_url": "https://example.com",
+    "links": [
+      {"url": "https://example.com/login", "text": "Login"},
+      {"url": "https://example.com/help", "text": "Help"}
+    ],
+    "dom_signals": {
+      "has_password_form": true,
+      "num_forms": 1,
+      "num_iframes": 0,
+      "num_external_scripts": 3,
+      "suspicious_keywords": ["verify account"]
+    },
+    "sanitized_html_excerpt": "<html><body>...</body></html>",
+    "content_hash_hint": "example.com:2:31"
+  }'
+```
+
+## K2 Think V2 Example Integration
 
 `src/k2_client.py` is an async wrapper around the official K2 Think V2 chat
 completions endpoint:
