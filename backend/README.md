@@ -15,6 +15,7 @@ This service is intended to:
 - `src/main.py`: FastAPI app with `/health` and `POST /analyze-link` routes.
 - `src/k2_client.py`: K2 Think V2 async client (chat + streaming).
 - `src/gemma_client.py`: Gemma vision async client (Google AI Studio).
+- `src/sandbox.py`: Playwright headless-Chromium screenshot capture.
 - `src/orchestrator.py`: Glue that runs the Gemma -> K2 pipeline and
   returns a unified risk response.
 - `tests/`: backend test scaffold.
@@ -25,7 +26,9 @@ This service is intended to:
 1. Create a virtual environment.
 2. Install package with dev dependencies:
    - `pip install -e ".[dev]"`
-3. Copy `.env.example` to `.env` and fill in `K2_API_KEY`.
+3. Install the Chromium browser used by Playwright (one-time, ~170MB):
+   - `playwright install chromium`
+4. Copy `.env.example` to `.env` and fill in `K2_API_KEY` and `GEMINI_API_KEY`.
 
 ## Run (placeholder app)
 
@@ -72,15 +75,20 @@ result = await client.chat([
 print(result.content)
 ```
 
-### Intended future wiring
+### Wiring (current)
 
-In the upcoming `POST /analyze-links` route:
+`POST /analyze-link` already runs the full pipeline:
 
-1. Receive and deduplicate URLs from the extension.
-2. Run Playwright sandbox extraction per URL.
-3. Pass sandbox output (and Gemma-derived multimodal features) into a K2 prompt.
-4. Transform K2 output into the unified response shape
-   (`risk`, `score`, `explanation`, `redirect_chain`, `key_signals`).
+1. Playwright captures the URL (`src/sandbox.py`).
+2. Gemma 4 scores the screenshot (`src/gemma_client.py`).
+3. K2 V2 reasons over the URL + Gemma's findings (`src/k2_client.py`).
+4. The orchestrator returns a unified `UnifiedRiskResponse`
+   (`risk`, `score`, `explanation`, `key_signals`, `gemma_vision`).
+
+Future work: deduplicating / batching URLs from the extension, and
+adding richer Playwright signals (redirect chain, network requests,
+external domains) to the `sandbox_signals` field that K2 already
+consumes.
 
 ## Gemma 4 Vision Client
 
@@ -131,28 +139,84 @@ vision = await gemma.score_screenshot("screenshot.png", url="https://example.com
 print(vision.score, vision.visual_signals)
 ```
 
-## Orchestrator (Gemma -> K2)
+## Playwright Capture
+
+`src/sandbox.py` launches a headless Chromium via Playwright, navigates
+to a URL, and returns viewport PNG bytes. It is called directly from
+`POST /analyze-link` so the caller never has to supply a screenshot.
+
+Implementation notes:
+
+- A single Playwright + Chromium instance is cached at module level
+  (lazy on first request) so repeat captures do not pay the ~2s
+  Chromium relaunch cost.
+- Each capture uses a fresh `BrowserContext`, so cookies, localStorage,
+  and service workers cannot leak between URLs.
+- 10 second navigation timeout, 750ms post-load settle.
+- The browser is closed cleanly via a FastAPI `lifespan` shutdown hook.
+
+### One-time setup
+
+After installing Python deps:
+
+```bash
+playwright install chromium
+```
+
+### Smoke test from the CLI
+
+Verifies Playwright is installed correctly without involving Gemma / K2:
+
+```bash
+python src/sandbox.py https://example.com /tmp/out.png
+# wrote 12345 bytes -> /tmp/out.png
+```
+
+### Use it from Python
+
+```python
+from sandbox import capture_screenshot, shutdown_browser
+
+png = await capture_screenshot("https://example.com")
+# ... do stuff ...
+await shutdown_browser()  # only on app shutdown
+```
+
+## Orchestrator (Playwright -> Gemma -> K2)
 
 `src/orchestrator.py` exposes `analyze_link(url, screenshot, ...)` which:
 
 1. Calls `GemmaClient.score_screenshot` to get a vision-only score and signals.
 2. Builds a K2 prompt that injects Gemma's findings (and any optional sandbox
-   signals from Playwright once that lands).
+   signals once richer Playwright capture lands).
 3. Calls `K2Client.chat` and parses K2's JSON into a `UnifiedRiskResponse`
    (`url`, `risk`, `score`, `explanation`, `key_signals`, `gemma_vision`).
 
-The Playwright sandbox layer is being built by another contributor; until
-it lands, screenshots are passed in directly (bytes, base64 string, data URL,
-or path on disk).
-
 ### Endpoint
 
-`POST /analyze-link` exposes the orchestrator over HTTP:
+`POST /analyze-link` is the full pipeline: it captures the screenshot
+itself via Playwright, then runs the orchestrator. Caller only sends
+the URL:
 
 ```bash
 curl -X POST http://localhost:8000/analyze-link \
   -H 'Content-Type: application/json' \
-  -d "$(jq -n --arg url 'https://example.com' \
-        --arg img "$(base64 < screenshot.png)" \
-        '{url:$url, screenshot_b64:$img}')"
+  -d '{"url": "https://example.com"}'
+```
+
+Example response:
+
+```json
+{
+  "url": "https://example.com",
+  "risk": "LOW",
+  "score": 0,
+  "explanation": "Plain example.com landing page with no risky elements.",
+  "key_signals": [],
+  "gemma_vision": {
+    "score": 0,
+    "summary": "Plain example.com landing page.",
+    "visual_signals": []
+  }
+}
 ```

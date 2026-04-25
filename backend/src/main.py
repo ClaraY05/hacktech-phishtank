@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import base64
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -11,21 +11,23 @@ from pydantic import BaseModel, Field
 from gemma_client import GemmaClient
 from k2_client import K2Client
 from orchestrator import analyze_link
+from sandbox import CaptureError, capture_screenshot, shutdown_browser
 
 
-app = FastAPI(title="AI Safe Link Backend")
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    yield
+    await shutdown_browser()
+
+
+app = FastAPI(title="AI Safe Link Backend", lifespan=lifespan)
 
 
 class AnalyzeLinkRequest(BaseModel):
-    url: str = Field(..., description="The URL the screenshot was captured from.")
-    screenshot_b64: str = Field(
-        ...,
-        description="Base64-encoded screenshot bytes (PNG/JPEG/WebP). "
-        "Accepts a raw base64 string or a 'data:<mime>;base64,...' data URL.",
-    )
+    url: str = Field(..., description="The URL to capture and analyze.")
     sandbox_signals: dict[str, Any] | None = Field(
         default=None,
-        description="Optional structured signals from the Playwright sandbox layer.",
+        description="Optional structured signals from the sandbox layer (future use).",
     )
 
 
@@ -54,27 +56,17 @@ def health() -> dict[str, str]:
 
 @app.post("/analyze-link")
 async def analyze_link_route(payload: AnalyzeLinkRequest) -> dict[str, Any]:
-    """Run the Gemma -> K2 pipeline for a single URL + screenshot.
-
-    Playwright is not yet wired in; the caller (or a test harness) provides
-    the screenshot directly as base64.
-    """
+    """Capture the URL with Playwright, then run the Gemma -> K2 pipeline."""
     try:
         gemma = _get_gemma_client()
         k2 = _get_k2_client()
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    raw = payload.screenshot_b64.strip()
-    if raw.startswith("data:"):
-        screenshot: bytes | str = raw
-    else:
-        try:
-            screenshot = base64.b64decode(raw, validate=True)
-        except (ValueError, base64.binascii.Error) as exc:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid base64 screenshot: {exc}"
-            ) from exc
+    try:
+        screenshot = await capture_screenshot(payload.url)
+    except CaptureError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     result = await analyze_link(
         url=payload.url,
