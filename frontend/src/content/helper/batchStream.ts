@@ -1,3 +1,12 @@
+// Streams analysis results from the backend through the extension's
+// background service worker. We can't fetch 127.0.0.1 directly from the
+// content script because Chrome's Local Network Access (LNA) policy
+// blocks page-origin -> loopback requests, even with CORS headers.
+// The SW runs in chrome-extension:// origin and is exempt when
+// manifest host_permissions includes the target.
+
+const ANALYZE_PORT_NAME = "ai-safe-link-analyze";
+
 export type LinkAnalysisResult = {
   url: string;
   risk: "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN";
@@ -11,7 +20,12 @@ export function scoreToRating(score: number): number {
   return Math.max(1, Math.min(10, 10 - Math.round(score / 11)));
 }
 
-export async function streamBatchAnalysis(
+type IncomingMessage =
+  | { type: "RESULT"; data: LinkAnalysisResult }
+  | { type: "DONE" }
+  | { type: "ERROR"; error: string };
+
+export function streamBatchAnalysis(
   payload: {
     pageUrl: string;
     links: { url: string; text: string }[];
@@ -21,51 +35,41 @@ export async function streamBatchAnalysis(
   },
   onResult: (result: LinkAnalysisResult) => void,
 ): Promise<void> {
-  const response = await fetch("http://127.0.0.1:8000/send-batch-links", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      page_url: payload.pageUrl,
-      links: payload.links,
-      dom_signals: payload.domSignals,
-      sanitized_html_excerpt: payload.sanitizedHtmlExcerpt,
-      content_hash_hint: payload.contentHashHint,
-    }),
-  });
+  return new Promise((resolve, reject) => {
+    const port = chrome.runtime.connect({ name: ANALYZE_PORT_NAME });
+    let settled = false;
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Backend HTTP ${response.status}: ${text}`);
-  }
-
-  if (!response.body) {
-    throw new Error("No response body from backend.");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      if (!raw) continue;
+    const settle = (err?: Error) => {
+      if (settled) return;
+      settled = true;
       try {
-        const data = JSON.parse(raw) as Record<string, unknown>;
-        if (!("done" in data)) {
-          onResult(data as unknown as LinkAnalysisResult);
-        }
+        port.disconnect();
       } catch {
-        // malformed SSE line, skip
+        // already disconnected
       }
+      if (err) reject(err);
+      else resolve();
+    };
+
+    port.onMessage.addListener((msg: IncomingMessage) => {
+      if (msg.type === "RESULT") {
+        onResult(msg.data);
+      } else if (msg.type === "DONE") {
+        settle();
+      } else if (msg.type === "ERROR") {
+        settle(new Error(msg.error));
+      }
+    });
+
+    port.onDisconnect.addListener(() => {
+      const lastError = chrome.runtime.lastError?.message;
+      settle(lastError ? new Error(lastError) : undefined);
+    });
+
+    try {
+      port.postMessage({ type: "START", payload });
+    } catch (err) {
+      settle(err instanceof Error ? err : new Error(String(err)));
     }
-  }
+  });
 }
