@@ -1,11 +1,27 @@
 import type { AnalyzeLinksMessage } from "./payloadBuilder";
 
-export function sendAnalyzeLinksMessage(payload: AnalyzeLinksMessage): void {
-  chrome.runtime.sendMessage(payload, (response) => {
-    if (chrome.runtime.lastError) {
-      console.error("AI Safe Link message error:", chrome.runtime.lastError.message);
-      return;
-    }
-    console.log("AI Safe Link backend response:", response);
+export type AnalyzeLinksResponse = {
+  ok: boolean;
+  data?: unknown;
+  error?: string;
+};
+
+export function sendAnalyzeLinksMessage(payload: AnalyzeLinksMessage): Promise<AnalyzeLinksResponse> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage(payload, (response: AnalyzeLinksResponse | undefined) => {
+      if (chrome.runtime.lastError) {
+        const errorMessage = chrome.runtime.lastError.message;
+        console.error("AI Safe Link message error:", errorMessage);
+        resolve({ ok: false, error: errorMessage });
+        return;
+      }
+
+      if (!response) {
+        resolve({ ok: false, error: "No response received from background script." });
+        return;
+      }
+
+      resolve(response);
+    });
   });
 }

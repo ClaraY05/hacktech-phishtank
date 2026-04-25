@@ -1,8 +1,37 @@
 .ai-safe-link-highlight {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   box-shadow: inset 0 0 0 0 transparent;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.45s ease, outline-color 0.2s ease;
 }
 
-.ai-safe-link-highlight:hover {
-  box-shadow: inset 0 0 0 2px red;
+.ai-safe-link-highlight:hover,
+.ai-safe-link-highlight:focus-visible {
+  box-shadow: inset 0 0 0 2px red !important;
+  outline-color: red !important;
+}
+
+.ai-safe-link-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  max-width: min(320px, calc(100vw - 24px));
+  min-width: 180px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(17, 17, 17, 0.95);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  z-index: 2147483647;
+  white-space: normal;
+  opacity: 0;
+  transform: translateY(0);
+  transition: opacity 0.12s ease;
+}
+
+.ai-safe-link-tooltip.is-visible {
+  opacity: 1;
 }
