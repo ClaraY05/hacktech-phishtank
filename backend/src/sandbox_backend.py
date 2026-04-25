@@ -13,8 +13,9 @@ Backends shipped:
   no extra dependencies, **no host isolation**. Fine for local dev
   and for capturing URLs you already trust.
 
-* ``PodmanBackend`` — runs the sandbox image in a fresh Podman
-  container per request, optionally under gVisor (``--runtime=runsc``).
+* ``DockerBackend`` — runs the sandbox image in a fresh Docker
+  container per request, optionally under gVisor (``--runtime=runsc``,
+  registered in ``/etc/docker/daemon.json`` — see ``backend/setup.sh``).
   Adds host-level isolation (namespaces, cgroups, dropped caps,
   read-only rootfs, optional kernel-syscall mediation). The container
   prints a ``SandboxResult`` JSON on stdout; we parse it back into the
@@ -64,8 +65,8 @@ class InProcessBackend:
         await shutdown_browser()
 
 
-class PodmanBackend:
-    """Run the sandbox image in a fresh Podman container per request.
+class DockerBackend:
+    """Run the sandbox image in a fresh Docker container per request.
 
     Defaults are deliberately strict:
 
@@ -75,7 +76,7 @@ class PodmanBackend:
     * ``--runtime=runsc`` (gVisor) when available
     """
 
-    name = "podman"
+    name = "docker"
 
     def __init__(
         self,
@@ -83,7 +84,7 @@ class PodmanBackend:
         image: str,
         use_runsc: bool,
         timeout_s: float,
-        podman_path: str,
+        docker_path: str,
         memory: str = "1g",
         cpus: str = "1.0",
         pids_limit: int = 200,
@@ -93,7 +94,7 @@ class PodmanBackend:
         self.image = image
         self.use_runsc = use_runsc
         self.timeout_s = timeout_s
-        self.podman_path = podman_path
+        self.docker_path = docker_path
         self.memory = memory
         self.cpus = cpus
         self.pids_limit = pids_limit
@@ -102,7 +103,7 @@ class PodmanBackend:
 
     def _build_cmd(self, url: str) -> list[str]:
         cmd: list[str] = [
-            self.podman_path, "run", "--rm",
+            self.docker_path, "run", "--rm",
             "--read-only",
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
@@ -128,7 +129,7 @@ class PodmanBackend:
             )
         except FileNotFoundError as exc:
             raise CaptureError(
-                f"podman binary not found at {self.podman_path!r}: {exc}"
+                f"docker binary not found at {self.docker_path!r}: {exc}"
             ) from exc
 
         try:
@@ -145,7 +146,7 @@ class PodmanBackend:
         if proc.returncode != 0:
             tail = stderr.decode(errors="replace")[-500:].strip()
             raise CaptureError(
-                f"podman exit {proc.returncode} for {url}: {tail}"
+                f"docker exit {proc.returncode} for {url}: {tail}"
             )
 
         try:
@@ -169,12 +170,12 @@ class PodmanBackend:
 def get_backend() -> SandboxBackend:
     """Choose the active backend from ``SANDBOX_BACKEND`` (default: inprocess).
 
-    Env vars (PodmanBackend only):
-      * ``SANDBOX_IMAGE`` — image tag, default ``safelink-sandbox``
-      * ``USE_RUNSC`` — ``1`` (default) to add ``--runtime=runsc``
+    Env vars (DockerBackend only):
+      * ``SANDBOX_IMAGE`` — image tag, default ``safe-link-worker``
+      * ``USE_RUNSC`` — ``1`` to add ``--runtime=runsc`` (gVisor)
       * ``SANDBOX_TIMEOUT_S`` — wall-clock cap, default 30s
-      * ``PODMAN_PATH`` — override podman binary location
-      * ``SANDBOX_NETWORK`` — Podman network name (e.g. ``sandbox-egress``)
+      * ``DOCKER_PATH`` — override docker binary location
+      * ``SANDBOX_NETWORK`` — Docker network name (e.g. ``sandbox-egress``)
       * ``SANDBOX_MEMORY``, ``SANDBOX_CPUS``, ``SANDBOX_PIDS_LIMIT``,
         ``SANDBOX_TMPFS_SIZE`` — cgroup tunables
     """
@@ -183,15 +184,16 @@ def get_backend() -> SandboxBackend:
     if name == "inprocess":
         return InProcessBackend()
 
-    if name == "podman":
+    if name == "docker":
         # Defaults match the image built by backend/Dockerfile; gVisor
         # opt-in (USE_RUNSC=1) until the host has runsc registered as
-        # a podman runtime — see backend/setup.sh.
-        return PodmanBackend(
+        # a docker runtime in /etc/docker/daemon.json — see
+        # backend/setup.sh.
+        return DockerBackend(
             image=os.getenv("SANDBOX_IMAGE", "safe-link-worker"),
             use_runsc=os.getenv("USE_RUNSC", "0") == "1",
             timeout_s=float(os.getenv("SANDBOX_TIMEOUT_S", "30")),
-            podman_path=os.getenv("PODMAN_PATH", shutil.which("podman") or "podman"),
+            docker_path=os.getenv("DOCKER_PATH", shutil.which("docker") or "docker"),
             memory=os.getenv("SANDBOX_MEMORY", "1g"),
             cpus=os.getenv("SANDBOX_CPUS", "1.0"),
             pids_limit=int(os.getenv("SANDBOX_PIDS_LIMIT", "200")),
@@ -200,5 +202,5 @@ def get_backend() -> SandboxBackend:
         )
 
     raise ValueError(
-        f"Unknown SANDBOX_BACKEND={name!r}; expected 'inprocess' or 'podman'"
+        f"Unknown SANDBOX_BACKEND={name!r}; expected 'inprocess' or 'docker'"
     )

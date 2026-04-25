@@ -3,19 +3,21 @@ Container entrypoint for the safe-link sandbox image.
 
 Receives a single URL on argv, runs the rich async ``capture()`` from
 ``sandbox.py``, and prints the resulting ``SandboxResult`` JSON document
-on stdout. This is the wire format ``sandbox_backend.PodmanBackend``
+on stdout. This is the wire format ``sandbox_backend.DockerBackend``
 parses back into a dict on the host side.
 
 Two design choices deliberately match what the host expects:
 
 * **Stdout is JSON only.** All progress / error chatter goes to stderr
-  so the parent ``podman run`` invocation can be ``json.loads()``'d
+  so the parent ``docker run`` invocation can be ``json.loads()``'d
   without filtering.
-* **Exit code reflects capture viability.** Non-zero exit when no
-  ``screenshot_b64`` could be produced (the host treats that as a
-  ``CaptureError``); zero exit otherwise, even if the SandboxResult
-  contains a soft ``error`` field (e.g. nav timeout but we still got a
-  partial DOM dump).fewfwe
+* **Exit 0 whenever a ``SandboxResult`` was produced** — even one with
+  ``screenshot_b64=None`` and a soft ``error`` field set (nav timeout,
+  net::ERR_*, etc.). This matches ``InProcessBackend``'s contract: the
+  host always gets a ``SandboxResult`` and inspects ``error`` itself.
+  Non-zero exit is reserved for catastrophic failures where we couldn't
+  even build a result (browser launch crashed, ``CaptureError`` raised,
+  bad argv); the host turns those into ``CaptureError``.
 """
 
 from __future__ import annotations
@@ -40,7 +42,7 @@ async def _run(url: str) -> int:
 
     json.dump(result, sys.stdout)
     sys.stdout.write("\n")
-    return 0 if result.get("screenshot_b64") else 1
+    return 0
 
 
 def main() -> None:

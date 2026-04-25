@@ -5,7 +5,7 @@
 FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
 
 # PYTHONUNBUFFERED=1     -> stdout flushes immediately so the parent
-#                           podman process sees worker output without
+#                           docker process sees worker output without
 #                           waiting for buffering.
 # PYTHONDONTWRITEBYTECODE=1 -> no .pyc clutter in the read-only image.
 # PYTHONPATH points at our /src so `from sandbox import ...` works.
@@ -32,6 +32,6 @@ USER pwuser
 # prints a SandboxResult JSON document on stdout. Status / error
 # messages go to stderr.
 #
-#   podman run --rm safe-link-worker https://example.com
-#   podman run --rm --runtime=runsc safe-link-worker https://example.com
+#   docker run --rm safe-link-worker https://example.com
+#   docker run --rm --runtime=runsc safe-link-worker https://example.com
 ENTRYPOINT ["python", "src/worker.py"]

@@ -264,11 +264,15 @@ async def _capture_impl(
         except PlaywrightError:
             pass
 
-    context.on("page", on_new_page)
-    context.on("download", on_download)
-
     try:
         page = await context.new_page()
+
+        # Register popup/download listeners *after* opening the main page so
+        # the explicit context.new_page() above doesn't show up as a phantom
+        # "new_tab" popup. Real popups (window.open, target=_blank) fire
+        # only after page activity begins below.
+        context.on("page", on_new_page)
+        context.on("download", on_download)
 
         def on_response(response: Response) -> None:
             response_urls.append(response.url)
