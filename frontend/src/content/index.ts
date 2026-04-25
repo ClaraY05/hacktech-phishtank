@@ -1,97 +1,36 @@
-console.log("AI Safe Link content script injected", window.location.href);
+import { discoverLinks, buildLinkPayload } from "./helper/linkScanner";
+import { collectDomSignals, sanitizeHtmlForAnalysis } from "./helper/sanitizer";
+import { highlightLinks, showBadge } from "./helper/styling";
+import { buildAnalyzePayload } from "./helper/payloadBuilder";
+import { sendAnalyzeLinksMessage } from "./helper/messages";
 
 const MAX_HTML_CHARS = 200_000;
 const MAX_LINKS = 500;
-const SUSPICIOUS_KEYWORDS = [
-  "verify account",
-  "urgent",
-  "suspended",
-  "password",
-  "login",
-  "bank",
-  "security alert",
-];
 
-function sanitizeHtmlForAnalysis(documentRoot: Document): string {
-  const clonedDocument = documentRoot.documentElement.cloneNode(true) as HTMLElement;
+async function runContentFlow(): Promise<void> {
+  console.log("AI Safe Link content script injected", window.location.href);
 
-  clonedDocument.querySelectorAll("script, style, noscript").forEach((node) => node.remove());
+  const discoveredLinks = discoverLinks(document);
+  await highlightLinks(discoveredLinks);
 
-  clonedDocument.querySelectorAll("*").forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      if (attr.name.toLowerCase().startsWith("on")) {
-        el.removeAttribute(attr.name);
-      }
-    }
-  });
+  const payloadLinks = buildLinkPayload(discoveredLinks, MAX_LINKS);
+  showBadge(payloadLinks.length);
 
-  clonedDocument.querySelectorAll("input").forEach((input) => {
-    const typeValue = (input.getAttribute("type") || "").toLowerCase();
-    if (typeValue === "password" || typeValue === "email" || typeValue === "tel") {
-      input.setAttribute("value", "");
-    }
-  });
+  if (payloadLinks.length === 0) {
+    return;
+  }
 
-  const html = clonedDocument.outerHTML;
-  return html.slice(0, MAX_HTML_CHARS);
-}
-
-function collectDomSignals(documentRoot: Document) {
-  const bodyText = (documentRoot.body?.innerText || "").toLowerCase();
-  const suspiciousKeywords = SUSPICIOUS_KEYWORDS.filter((keyword) => bodyText.includes(keyword));
-
-  return {
-    has_password_form: documentRoot.querySelector('input[type="password"]') !== null,
-    num_forms: documentRoot.querySelectorAll("form").length,
-    num_iframes: documentRoot.querySelectorAll("iframe").length,
-    num_external_scripts: Array.from(documentRoot.querySelectorAll("script[src]")).filter((script) => {
-      const src = script.getAttribute("src");
-      return src ? !src.startsWith("/") && !src.startsWith(window.location.origin) : false;
-    }).length,
-    suspicious_keywords: suspiciousKeywords,
-  };
-}
-
-const discoveredLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"));
-
-const payload = discoveredLinks.slice(0, MAX_LINKS).map((link) => ({
-  url: link.href,
-  text: (link.textContent || "").trim(),
-}));
-
-const badge = document.createElement("div");
-badge.textContent = `AI Safe Link active: found ${payload.length} links`;
-badge.style.position = "fixed";
-badge.style.bottom = "12px";
-badge.style.right = "12px";
-badge.style.zIndex = "999999";
-badge.style.background = "#111";
-badge.style.color = "#fff";
-badge.style.padding = "8px 10px";
-badge.style.borderRadius = "8px";
-document.body.appendChild(badge);
-
-// Placeholder hook: replace with background message or direct API request later.
-if (payload.length > 0) {
-  console.log(`AI Safe Link found ${payload.length} links on page`);
+  console.log(`AI Safe Link found ${payloadLinks.length} links on page`);
   const domSignals = collectDomSignals(document);
-  const sanitizedHtmlExcerpt = sanitizeHtmlForAnalysis(document);
+  const sanitizedHtmlExcerpt = sanitizeHtmlForAnalysis(document, MAX_HTML_CHARS);
+  const message = buildAnalyzePayload({
+    pageUrl: window.location.href,
+    links: payloadLinks,
+    domSignals,
+    sanitizedHtmlExcerpt,
+  });
 
-  chrome.runtime.sendMessage(
-    {
-      type: "ANALYZE_LINKS",
-      pageUrl: window.location.href,
-      links: payload,
-      domSignals,
-      sanitizedHtmlExcerpt,
-      contentHashHint: `${window.location.hostname}:${payload.length}:${sanitizedHtmlExcerpt.length}`,
-    },
-    (response) => {
-      if (chrome.runtime.lastError) {
-        console.error("AI Safe Link message error:", chrome.runtime.lastError.message);
-        return;
-      }
-      console.log("AI Safe Link backend response:", response);
-    },
-  );
+  sendAnalyzeLinksMessage(message);
 }
+
+void runContentFlow();

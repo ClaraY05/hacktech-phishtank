@@ -5,8 +5,15 @@ Manifest V3 Chrome extension scaffold for AI Safe Link Sandbox.
 ## Structure
 
 - `manifest.json`: extension manifest.
-- `src/content/index.ts`: link discovery/content script placeholder.
-- `src/background/index.ts`: service worker placeholder for backend orchestration.
+- `src/content/index.ts`: content-script orchestration entrypoint.
+- `src/content/helper/linkScanner.ts`: link recognition + link payload shaping.
+- `src/content/helper/sanitizer.ts`: DOM signal extraction + HTML sanitization/truncation.
+- `src/content/helper/styling.ts`: stylesheet injection and link class highlighting.
+- `src/content/helper/styles.css`: class-based link highlight styles.
+- `src/content/helper/payloadBuilder.ts`: message payload formatting for background.
+- `src/content/helper/messages.ts`: content -> background messaging helper.
+- `src/background/index.ts`: thin message router.
+- `src/background/helper/apiClient.ts`: backend HTTP client for `/analyze-links`.
 - `src/popup/popup.html`: popup UI shell.
 - `src/popup/index.ts`: popup TypeScript entrypoint.
 
@@ -26,6 +33,7 @@ Manifest V3 Chrome extension scaffold for AI Safe Link Sandbox.
 
 Chrome loads JavaScript files from `dist/` based on `manifest.json`.  
 Edits in `src/**/*.ts` do **not** appear in Chrome until you rebuild.
+The build now uses `esbuild` bundling so extension scripts do not ship raw import statements.
 
 Use this loop whenever you change extension code:
 
@@ -45,9 +53,25 @@ Optional for faster iteration:
 - Confirm `manifest.json` points to `dist/content/index.js`.
 - In Chrome DevTools (on the target webpage), look for logs such as:
   - `AI Safe Link content script injected`
-  - `AI Safe Link content script discovered links`
+  - `AI Safe Link found <count> links on page`
 - In DevTools Sources, check:
   - `Content scripts -> AI Safe Link Sandbox -> dist/content/index.js`
+
+## Current Visual Behavior
+
+- The content script adds a CSS class to every `a[href]` and styles it as a red box.
+- This is applied at content-script load time (existing links on initial page render).
+- After code changes, rebuild (`npm run build`) and reload the extension in Chrome to apply updates.
+
+## Where To Change Key Behaviors
+
+- HTML sanitization logic: `src/content/helper/sanitizer.ts`
+- Link recognition and payload link extraction: `src/content/helper/linkScanner.ts`
+- Red-box class styling: `src/content/helper/styles.css`
+- Style injection/class application: `src/content/helper/styling.ts`
+- Backend payload shape before send: `src/content/helper/payloadBuilder.ts`
+- Content -> background send behavior: `src/content/helper/messages.ts`
+- Background -> backend request behavior: `src/background/helper/apiClient.ts`
 
 ## Notes
 

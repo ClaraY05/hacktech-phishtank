@@ -5,12 +5,20 @@
   "description": "Chrome extension scaffold for AI Safe Link Sandbox.",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json",
-    "watch": "tsc -p tsconfig.json --watch",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && npm run build:content && npm run build:background && npm run build:popup",
+    "build:content": "esbuild src/content/index.ts --bundle --outfile=dist/content/index.js --format=iife --platform=browser --target=es2022",
+    "build:background": "esbuild src/background/index.ts --bundle --outfile=dist/background/index.js --format=iife --platform=browser --target=es2022",
+    "build:popup": "esbuild src/popup/index.ts --bundle --outfile=dist/popup/index.js --format=iife --platform=browser --target=es2022",
+    "watch": "npm run watch:content & npm run watch:background & npm run watch:popup",
+    "watch:content": "esbuild src/content/index.ts --bundle --outfile=dist/content/index.js --format=iife --platform=browser --target=es2022 --watch",
+    "watch:background": "esbuild src/background/index.ts --bundle --outfile=dist/background/index.js --format=esm --platform=browser --target=es2022 --watch",
+    "watch:popup": "esbuild src/popup/index.ts --bundle --outfile=dist/popup/index.js --format=iife --platform=browser --target=es2022 --watch",
     "dev": "npm run watch"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.280",
+    "esbuild": "^0.28.0",
     "typescript": "^5.6.3"
   }
 }

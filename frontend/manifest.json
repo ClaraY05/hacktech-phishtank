@@ -6,14 +6,19 @@
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": ["<all_urls>", "http://127.0.0.1:8000/*", "http://localhost:8000/*"],
   "background": {
-    "service_worker": "dist/background/index.js",
-    "type": "module"
+    "service_worker": "dist/background/index.js"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["dist/content/index.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/content/helper/styles.css"],
+      "matches": ["<all_urls>"]
     }
   ],
   "action": {
