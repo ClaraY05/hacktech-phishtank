@@ -2,7 +2,7 @@
   "name": "ai-safe-link-extension",
   "version": "0.1.0",
   "private": true,
-  "description": "Chrome extension scaffold for AI Safe Link Sandbox.",
+  "description": "Chrome extension scaffold for PhishTank.",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",

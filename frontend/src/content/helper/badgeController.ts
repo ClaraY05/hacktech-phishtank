@@ -2,10 +2,10 @@ import { getBubbleState, setFeatureActivation, setStateChangeListener } from "./
 import { hideTooltip } from "./tooltipController";
 import { BADGE_ANALYZING_CLASS, BADGE_ID } from "./uiConstants";
 
-const DISABLED_BADGE_TEXT = "AI Safe Link disabled (click to enable)";
+const DISABLED_BADGE_TEXT = "PhishTank disabled (click to enable)";
 const ACTIVE_BADGE_SUFFIX = " (click to disable)";
-const ANALYZING_BADGE_TEXT_SHORT = "AI Safe Link: analyzing.";
-const ANALYZING_BADGE_TEXT_LONG = "AI Safe Link: analyzing..";
+const ANALYZING_BADGE_TEXT_SHORT = "PhishTank: analyzing.";
+const ANALYZING_BADGE_TEXT_LONG = "PhishTank: analyzing..";
 
 let badgeElement: HTMLDivElement | null = null;
 let currentBadgeLinkCount = 0;
@@ -46,7 +46,7 @@ function updateBadgeText(): void {
   }
   badgeElement.textContent =
     bubbleState === "enabled"
-      ? `AI Safe Link active: found ${currentBadgeLinkCount} links${ACTIVE_BADGE_SUFFIX}`
+      ? `PhishTank active: found ${currentBadgeLinkCount} links${ACTIVE_BADGE_SUFFIX}`
       : DISABLED_BADGE_TEXT;
 }
 

@@ -3,62 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Safe Link</title>
-    <link rel="stylesheet" href="./styles/index.css" />
+    <title>PhishTank</title>
   </head>
   <body>
-    <div class="shell">
-      <div class="orb one"></div>
-      <div class="orb two"></div>
-
-      <div class="app">
-        <div class="card">
-          <div class="card-head">
-            <div class="title"><span class="dot"></span> AI Safe Link</div>
-            <span class="chip live">Live</span>
-          </div>
-          <div class="body">
-            <div class="status-box">
-              <div class="status-label">Current protection state</div>
-              <div id="status">Loading...</div>
-            </div>
-            <div class="metrics">
-              <div class="metric">
-                <div class="metric-label">Scanned</div>
-                <div id="scannedCount" class="metric-value">0</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Flagged</div>
-                <div id="flaggedCount" class="metric-value" style="color: var(--coral)">0</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Safe</div>
-                <div id="safeCount" class="metric-value" style="color: var(--teal)">0</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <div class="title"><span class="dot"></span> Recent checks</div>
-            <span class="chip warn mono">session</span>
-          </div>
-          <div class="body">
-            <div id="recentList" class="list">
-              <div class="item">
-                <div class="item-row">
-                  <span class="item-url mono">No recent items yet</span>
-                  <span class="chip live">waiting</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="foot mono">AI SAFE LINK · SANDBOX VIEW</div>
-      </div>
-    </div>
+    <div id="popupRoot"></div>
     <script src="../../dist/popup/index.js"></script>
   </body>
 </html>
