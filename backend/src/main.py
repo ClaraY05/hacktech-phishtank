@@ -20,10 +20,11 @@ import base64
 import json
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, HttpUrl
@@ -43,15 +44,24 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     backend: SandboxBackend = get_backend()
+    isolated = backend.name != "inprocess"
+    logger.info("sandbox backend: %s (container isolation: %s)", backend.name, isolated)
+    if not isolated:
+        logger.warning("running IN-PROCESS (no container isolation) — set SANDBOX_BACKEND=podman for production")
+
     cache = AnalysisCache(
         max_entries=int(os.getenv("ANALYSIS_CACHE_MAX", "10000")),
         ttl_seconds=float(os.getenv("ANALYSIS_CACHE_TTL_S", "3600")),
     )
+    logger.info("analysis cache: max=%s ttl=%ss", cache._cache.max_entries, cache._cache.ttl_seconds)
+
     app.state.sandbox_backend = backend
     app.state.cache = cache
+    logger.info("startup complete")
     try:
         yield
     finally:
+        logger.info("shutting down sandbox backend: %s", backend.name)
         await backend.aclose()
 
 
@@ -64,6 +74,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next: Any) -> Any:
+    start = time.monotonic()
+    response = await call_next(request)
+    ms = (time.monotonic() - start) * 1000
+    logger.info("%s %s -> %d (%.0fms)", request.method, request.url.path, response.status_code, ms)
+    return response
 
 
 class LinkInput(BaseModel):

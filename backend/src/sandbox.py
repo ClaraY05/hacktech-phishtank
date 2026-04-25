@@ -30,10 +30,13 @@ import argparse
 import asyncio
 import base64
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import TypedDict
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 from playwright.async_api import (
     Browser,
@@ -155,9 +158,11 @@ async def _get_browser() -> Browser:
     async with _browser_lock:
         if _browser is not None and _browser.is_connected():
             return _browser
+        logger.info("launching Playwright Chromium (headless)")
         if _playwright is None:
             _playwright = await async_playwright().start()
         _browser = await _playwright.chromium.launch(headless=True)
+        logger.info("Playwright Chromium started")
     return _browser
 
 
