@@ -10,17 +10,18 @@
   inset: -2px;
   pointer-events: none;
   opacity: 0;
+  --risk-color: #f5b301;
   background:
-    linear-gradient(#f5b301, #f5b301) top left / 0% 2px no-repeat,
-    linear-gradient(#f5b301, #f5b301) bottom left / 0% 2px no-repeat,
-    linear-gradient(#f5b301, #f5b301) top left / 2px 0% no-repeat,
-    linear-gradient(#f5b301, #f5b301) top right / 2px 0% no-repeat;
+    linear-gradient(var(--risk-color), var(--risk-color)) top left / 0% 2px no-repeat,
+    linear-gradient(var(--risk-color), var(--risk-color)) bottom left / 0% 2px no-repeat,
+    linear-gradient(var(--risk-color), var(--risk-color)) top left / 2px 0% no-repeat,
+    linear-gradient(var(--risk-color), var(--risk-color)) top right / 2px 0% no-repeat;
   transition: background-size 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
 }
 
 .ai-safe-link-highlight:hover,
 .ai-safe-link-highlight:focus-visible {
-  outline-color: #f5b301 !important;
+  outline-color: var(--risk-color, #f5b301) !important;
 }
 
 .ai-safe-link-highlight:hover::before,
@@ -28,3 +29,7 @@
   opacity: 1;
   background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
 }
+
+.ai-safe-link-highlight[data-ai-risk="low"] { --risk-color: #22c55e; }
+.ai-safe-link-highlight[data-ai-risk="medium"] { --risk-color: #f5b301; }
+.ai-safe-link-highlight[data-ai-risk="high"] { --risk-color: #ef4444; }

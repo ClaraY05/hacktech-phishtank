@@ -7,7 +7,9 @@ name = "ai-safe-link-backend"
 version = "0.1.0"
 description = "Backend scaffold for AI Safe Link Sandbox orchestration."
 readme = "README.md"
-requires-python = ">=3.11"
+# 3.10 to match the Microsoft Playwright Docker base image
+# (mcr.microsoft.com/playwright/python:v1.58.0-noble ships Python 3.10).
+requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.115.0",
   "uvicorn[standard]>=0.30.0",
@@ -22,5 +24,11 @@ dev = [
   "ruff>=0.6.0",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+# Map our flat src/ layout onto a single distribution package so
+# `pip install .` inside the container picks up sandbox.py / worker.py
+# / etc. without us having to reorganize into a nested package.
+[tool.setuptools]
+packages = ["ai_safe_link_backend"]
+
+[tool.setuptools.package-dir]
+"ai_safe_link_backend" = "src"

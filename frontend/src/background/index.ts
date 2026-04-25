@@ -1,4 +1,7 @@
 import { postAnalyzeLinks } from "./helper/apiClient";
+import { streamBatchToCallback, type StreamPayload } from "./helper/streamProxy";
+
+const ANALYZE_PORT_NAME = "ai-safe-link-analyze";
 import type { BubbleState } from "../content/helper/uiConstants";
 
 const POPUP_WINDOW_WIDTH = 420;
@@ -116,4 +119,61 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // Keep the response channel open for async fetch completion.
     return true;
   }
+});
+
+// Streaming bridge for the content script. Content script can't fetch
+// 127.0.0.1 directly because Chrome's Local Network Access blocks
+// page-origin -> loopback. The SW runs in chrome-extension:// origin
+// which is exempt when manifest host_permissions lists the target.
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== ANALYZE_PORT_NAME) return;
+
+  const controller = new AbortController();
+  let started = false;
+
+  port.onDisconnect.addListener(() => {
+    controller.abort();
+  });
+
+  port.onMessage.addListener((msg) => {
+    if (msg?.type !== "START" || started) return;
+    started = true;
+    const payload = msg.payload as StreamPayload;
+
+    streamBatchToCallback(
+      payload,
+      (data) => {
+        try {
+          port.postMessage({ type: "RESULT", data });
+        } catch {
+          // port already closed
+          controller.abort();
+        }
+      },
+      controller.signal,
+    )
+      .then(() => {
+        try {
+          port.postMessage({ type: "DONE" });
+        } catch {
+          // ignore — port may have been closed by the content script
+        }
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        const text = error instanceof Error ? error.message : String(error);
+        try {
+          port.postMessage({ type: "ERROR", error: text });
+        } catch {
+          // ignore
+        }
+      })
+      .finally(() => {
+        try {
+          port.disconnect();
+        } catch {
+          // already disconnected
+        }
+      });
+  });
 });

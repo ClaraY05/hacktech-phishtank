@@ -1,15 +1,12 @@
 import { discoverLinks, buildLinkPayload } from "./helper/linkScanner";
 import { collectDomSignals, sanitizeHtmlForAnalysis } from "./helper/sanitizer";
 import {
-  applyLinkTooltips,
   getBubbleState,
   highlightLinks,
   initializeFeatureActivationState,
-  setBadgeAnalyzing,
   showBadge,
 } from "./helper/styling";
-import { buildAnalyzePayload } from "./helper/payloadBuilder";
-import { sendAnalyzeLinksMessage } from "./helper/messages";
+import { setPageContext } from "./helper/hoverAnalyzer";
 
 const MAX_HTML_CHARS = 200_000;
 const MAX_LINKS = 500;
@@ -84,14 +81,8 @@ async function runContentFlow(): Promise<void> {
 
   const payloadLinks = buildLinkPayload(discoveredLinks, MAX_LINKS);
   showBadge(payloadLinks.length);
-  const bubbleState = getBubbleState();
 
-  if (bubbleState === "disabled") {
-    return;
-  }
-
-  if (bubbleState === "analyzing") {
-    applyLinkTooltips(discoveredLinks, [], ANALYZING_TOOLTIP_TEXT);
+  if (getBubbleState() === "disabled") {
     return;
   }
 
@@ -99,26 +90,21 @@ async function runContentFlow(): Promise<void> {
     return;
   }
 
+  // Stash page context once; per-link requests fire on hover (see hoverAnalyzer).
+  // The background SW also rate-limits all outbound requests to stay below
+  // Gemini's 15 RPM free-tier ceiling (see background/helper/rateLimiter.ts).
   console.log(`PhishTank found ${payloadLinks.length} links on page`);
   const domSignals = collectDomSignals(document);
   const sanitizedHtmlExcerpt = sanitizeHtmlForAnalysis(document, MAX_HTML_CHARS);
-  const message = buildAnalyzePayload({
+  setPageContext({
     pageUrl: window.location.href,
-    links: payloadLinks,
     domSignals,
     sanitizedHtmlExcerpt,
   });
 
-  setBadgeAnalyzing(true);
-  const response = await sendAnalyzeLinksMessage(message);
-  setBadgeAnalyzing(false);
-  if (!response.ok) {
-    applyLinkTooltips(discoveredLinks, [], FALLBACK_TOOLTIP_TEXT);
-    return;
-  }
-
-  const tooltipTexts = extractTooltipTextsFromResponse(response.data, discoveredLinks.length);
-  applyLinkTooltips(discoveredLinks, tooltipTexts, FALLBACK_TOOLTIP_TEXT);
+  console.log(
+    `AI Safe Link ready — ${payloadLinks.length} links found; analysis fires on hover`,
+  );
 }
 
 void runContentFlow();
