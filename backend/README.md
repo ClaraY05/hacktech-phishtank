@@ -13,7 +13,7 @@ This service is intended to:
 ## Structure
 
 - `src/main.py`: FastAPI app placeholder and health route.
-- `src/k2_client_example.py`: K2 Think V2 API call template.
+- `src/k2_client.py`: K2 Think V2 async client (chat + streaming).
 - `tests/`: backend test scaffold.
 - `.env.example`: environment variable template for local setup.
 
@@ -22,7 +22,7 @@ This service is intended to:
 1. Create a virtual environment.
 2. Install package with dev dependencies:
    - `pip install -e ".[dev]"`
-3. Copy `.env.example` to `.env` and fill values.
+3. Copy `.env.example` to `.env` and fill in `K2_API_KEY`.
 
 ## Run (placeholder app)
 
@@ -30,23 +30,51 @@ This service is intended to:
 uvicorn main:app --reload --app-dir src
 ```
 
-## K2 Think V2 Example Integration
+## K2 Think V2 Client
 
-The file `src/k2_client_example.py` includes a template for backend-side model calls using:
+`src/k2_client.py` is an async wrapper around the official K2 Think V2 chat
+completions endpoint:
 
-- environment-based credentials (`K2_API_KEY`)
-- configurable base URL (`K2_BASE_URL`)
-- configurable model ID (`K2_MODEL`)
+- Endpoint: `https://api.k2think.ai/v1/chat/completions`
+- Model: `MBZUAI-IFM/K2-Think-v2`
+- Auth: bearer token in `K2_API_KEY`
 
-It uses a chat-completions style payload so it can be adapted to the latest K2 endpoint and schema from:
+Configurable via env vars (or `.env` if `python-dotenv` is installed):
 
-- https://www.k2think.ai/k2think
+- `K2_API_KEY` (required)
+- `K2_BASE_URL` (default `https://api.k2think.ai`)
+- `K2_MODEL` (default `MBZUAI-IFM/K2-Think-v2`)
 
-### Intended Future Wiring
+### Smoke test from the CLI
 
-In your future `POST /analyze-links` route:
+After installing deps and setting `K2_API_KEY`:
 
-1. Receive and deduplicate URLs.
-2. Run sandbox extraction per URL.
-3. Pass sandbox output into `K2Client.analyze_signals(...)`.
-4. Transform model output into your response shape (`risk`, `score`, `explanation`, `redirect_chain`).
+```bash
+# non-streaming
+python src/k2_client.py "What is 17 * 23? Show your reasoning."
+
+# streaming (tokens print as they arrive)
+python src/k2_client.py --stream "Explain quantum tunneling in two sentences."
+```
+
+### Use it from Python
+
+```python
+from k2_client import K2Client
+
+client = K2Client()
+result = await client.chat([
+    {"role": "user", "content": "hi there"},
+])
+print(result.content)
+```
+
+### Intended future wiring
+
+In the upcoming `POST /analyze-links` route:
+
+1. Receive and deduplicate URLs from the extension.
+2. Run Playwright sandbox extraction per URL.
+3. Pass sandbox output (and Gemma-derived multimodal features) into a K2 prompt.
+4. Transform K2 output into the unified response shape
+   (`risk`, `score`, `explanation`, `redirect_chain`, `key_signals`).
