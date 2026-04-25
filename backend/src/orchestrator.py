@@ -6,8 +6,9 @@ Pipeline:
                       ->  K2Client.chat                  (final risk verdict)
                       ->  UnifiedRiskResponse
 
-Playwright integration is intentionally out of scope here; the screenshot
-(and any optional sandbox signals) are passed in by the caller.
+The screenshot bytes and an optional ``sandbox_signals`` dict (typically the
+Playwright ``SandboxResult`` minus the screenshot) are supplied by the caller
+(``main.py`` does this for the ``POST /analyze-link`` route).
 """
 
 from __future__ import annotations
@@ -89,16 +90,45 @@ async def analyze_link(
     return _build_unified_response(url=url, vision=vision, parsed=parsed)
 
 
+_MAX_NETWORK_REQUESTS_IN_PROMPT = 20
+_MAX_EXTERNAL_DOMAINS_IN_PROMPT = 15
+
+
+def _summarize_sandbox_signals(
+    signals: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Trim large fields so the K2 prompt stays a sane size."""
+    if not signals:
+        return None
+
+    trimmed: dict[str, Any] = dict(signals)
+
+    requests = trimmed.get("network_requests")
+    if isinstance(requests, list) and len(requests) > _MAX_NETWORK_REQUESTS_IN_PROMPT:
+        kept = requests[:_MAX_NETWORK_REQUESTS_IN_PROMPT]
+        trimmed["network_requests"] = kept
+        trimmed["network_requests_omitted"] = len(requests) - len(kept)
+
+    domains = trimmed.get("external_domains")
+    if isinstance(domains, list) and len(domains) > _MAX_EXTERNAL_DOMAINS_IN_PROMPT:
+        kept = domains[:_MAX_EXTERNAL_DOMAINS_IN_PROMPT]
+        trimmed["external_domains_total"] = len(domains)
+        trimmed["external_domains"] = kept
+
+    return trimmed
+
+
 def _build_k2_prompt(
     *,
     url: str,
     vision: GemmaVisionScore,
     sandbox_signals: dict[str, Any] | None,
 ) -> str:
+    summary = _summarize_sandbox_signals(sandbox_signals)
     sandbox_block = (
-        json.dumps(sandbox_signals, indent=2)
-        if sandbox_signals
-        else "(none provided yet -- Playwright integration pending)"
+        json.dumps(summary, indent=2, default=str)
+        if summary
+        else "(no sandbox signals)"
     )
 
     return f"""Evaluate the following link for safety.

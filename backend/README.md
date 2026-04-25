@@ -15,7 +15,10 @@ This service is intended to:
 - `src/main.py`: FastAPI app with `/health` and `POST /analyze-link` routes.
 - `src/k2_client.py`: K2 Think V2 async client (chat + streaming).
 - `src/gemma_client.py`: Gemma vision async client (Google AI Studio).
-- `src/sandbox.py`: Playwright headless-Chromium screenshot capture.
+- `src/sandbox.py`: Playwright headless-Chromium capture (screenshot +
+  redirect chain, popups, downloads, network, external domains).
+- `Dockerfile`, `setup.sh`: container image + host bootstrap for the
+  future Podman + gVisor sandbox (work-in-progress, see notes below).
 - `src/orchestrator.py`: Glue that runs the Gemma -> K2 pipeline and
   returns a unified risk response.
 - `tests/`: backend test scaffold.
@@ -29,6 +32,9 @@ This service is intended to:
 3. Install the Chromium browser used by Playwright (one-time, ~170MB):
    - `playwright install chromium`
 4. Copy `.env.example` to `.env` and fill in `K2_API_KEY` and `GEMINI_API_KEY`.
+5. (Container host only, Linux/WSL) Install Podman + gVisor for the
+   future containerized sandbox: `chmod +x ./setup.sh && ./setup.sh`.
+   Not needed for in-process Playwright dev on macOS.
 
 ## Run (placeholder app)
 
@@ -77,18 +83,22 @@ print(result.content)
 
 ### Wiring (current)
 
-`POST /analyze-link` already runs the full pipeline:
+`POST /analyze-link` runs the full pipeline:
 
-1. Playwright captures the URL (`src/sandbox.py`).
+1. Playwright captures the URL (`src/sandbox.py`) — returns a rich
+   `SandboxResult` with the screenshot plus redirect chain, popups,
+   downloads, network requests, and external domains.
 2. Gemma 4 scores the screenshot (`src/gemma_client.py`).
-3. K2 V2 reasons over the URL + Gemma's findings (`src/k2_client.py`).
+3. K2 V2 reasons over the URL, Gemma's findings, and the trimmed
+   sandbox signals (`src/k2_client.py`).
 4. The orchestrator returns a unified `UnifiedRiskResponse`
    (`risk`, `score`, `explanation`, `key_signals`, `gemma_vision`).
 
-Future work: deduplicating / batching URLs from the extension, and
-adding richer Playwright signals (redirect chain, network requests,
-external domains) to the `sandbox_signals` field that K2 already
-consumes.
+Future work: moving Playwright into a per-request Podman + gVisor
+container (`Dockerfile` and `setup.sh` already in place; FastAPI just
+needs to swap `capture()` to spawn the container instead of running
+Playwright in-process). The capture API and the orchestrator stay the
+same when that lands.
 
 ## Gemma 4 Vision Client
 
@@ -142,8 +152,25 @@ print(vision.score, vision.visual_signals)
 ## Playwright Capture
 
 `src/sandbox.py` launches a headless Chromium via Playwright, navigates
-to a URL, and returns viewport PNG bytes. It is called directly from
-`POST /analyze-link` so the caller never has to supply a screenshot.
+to a URL, and returns a structured `SandboxResult`:
+
+```python
+class SandboxResult(TypedDict):
+    url: str
+    final_url: str
+    redirect_chain: list[str]
+    screenshot_b64: str | None
+    page_title: str
+    downloads_detected: list[DownloadInfo]
+    popups_detected: list[PopupInfo]   # new tabs + JS dialogs
+    external_domains: list[str]
+    num_requests_total: int
+    network_requests: list[RequestInfo]  # capped at 150, filtered
+    error: str | None
+```
+
+`POST /analyze-link` calls it directly, so the caller never has to
+supply a screenshot.
 
 Implementation notes:
 
@@ -152,7 +179,11 @@ Implementation notes:
   Chromium relaunch cost.
 - Each capture uses a fresh `BrowserContext`, so cookies, localStorage,
   and service workers cannot leak between URLs.
-- 10 second navigation timeout, 750ms post-load settle.
+- 12 second navigation timeout, 1s post-load settle, 1280×800 viewport.
+- Concurrent captures bounded by an `asyncio.Semaphore` (max 5).
+- New tabs / popups are captured recursively at depth 1.
+- JS `alert/confirm/prompt` dialogs are dismissed and recorded.
+- Downloads are intercepted, recorded, and cancelled (no bytes hit disk).
 - The browser is closed cleanly via a FastAPI `lifespan` shutdown hook.
 
 ### One-time setup
@@ -165,30 +196,38 @@ playwright install chromium
 
 ### Smoke test from the CLI
 
-Verifies Playwright is installed correctly without involving Gemma / K2:
+Verifies Playwright is installed correctly without involving Gemma / K2.
+The CLI deliberately matches the wire format the future container will
+use: `SandboxResult` JSON on stdout, status messages on stderr.
 
 ```bash
-python src/sandbox.py https://example.com /tmp/out.png
-# wrote 12345 bytes -> /tmp/out.png
+python src/sandbox.py https://example.com
+python src/sandbox.py https://example.com --out /tmp/out.png
 ```
 
 ### Use it from Python
 
 ```python
-from sandbox import capture_screenshot, shutdown_browser
+from sandbox import capture, capture_screenshot, shutdown_browser
 
+# rich result (preferred)
+result = await capture("https://example.com")
+print(result["redirect_chain"], result["external_domains"])
+
+# screenshot bytes only (back-compat)
 png = await capture_screenshot("https://example.com")
-# ... do stuff ...
+
 await shutdown_browser()  # only on app shutdown
 ```
 
 ## Orchestrator (Playwright -> Gemma -> K2)
 
-`src/orchestrator.py` exposes `analyze_link(url, screenshot, ...)` which:
+`src/orchestrator.py` exposes `analyze_link(url, screenshot, sandbox_signals=...)`
+which:
 
 1. Calls `GemmaClient.score_screenshot` to get a vision-only score and signals.
-2. Builds a K2 prompt that injects Gemma's findings (and any optional sandbox
-   signals once richer Playwright capture lands).
+2. Builds a K2 prompt that injects Gemma's findings and a trimmed view of the
+   sandbox signals (`network_requests` capped, `external_domains` summarized).
 3. Calls `K2Client.chat` and parses K2's JSON into a `UnifiedRiskResponse`
    (`url`, `risk`, `score`, `explanation`, `key_signals`, `gemma_vision`).
 
