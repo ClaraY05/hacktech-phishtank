@@ -3,8 +3,9 @@ Playwright sandbox capture for AI Safe Link.
 
 Loads a URL in a headless Chromium and returns a structured ``SandboxResult``:
 the rendered screenshot (base64 PNG), redirect chain, page title, downloads
-detected, popups (new tabs + JS dialogs), external domains contacted, and a
-curated list of network requests.
+detected, popups (new tabs + JS dialogs), external domains contacted, a
+curated list of network requests, and the page's external ``<a href>`` link
+targets enriched with cheap URL-string suspicion scores (no extra browsing).
 
 A single Playwright + Chromium instance is cached at module level so repeat
 captures do not pay the ~2s relaunch cost. Each capture uses a fresh
@@ -55,7 +56,44 @@ MAX_STORED_REQUESTS = 150
 MAX_POPUP_DEPTH = 1
 MAX_CONCURRENT_BROWSERS = 5
 
+# Caps for link enumeration. We only score external links (different host
+# than the origin URL); internal navigation is ignored as noise.
+MAX_RAW_HREFS = 1_000
+MAX_LINK_TARGETS = 50
+MAX_SUSPICIOUS_LINKS = 10
+
 _IMPORTANT_RESOURCE_TYPES = {"document", "script", "xhr", "fetch", "websocket"}
+
+# Heuristic word/host lists for cheap URL-string suspicion scoring.
+# These are deliberately small and conservative; misses are fine since
+# K2 sees the full link list and the visual evidence too.
+_SUSPICIOUS_TLDS = frozenset({
+    "tk", "ml", "ga", "cf", "gq",
+    "top", "xyz", "click", "download", "zip", "loan", "men",
+    "review", "country", "stream", "gdn", "racing", "win",
+    "trade", "date", "party", "science", "work", "rest", "fit",
+})
+
+_URL_SHORTENERS = frozenset({
+    "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
+    "buff.ly", "is.gd", "rebrand.ly", "cutt.ly", "rb.gy",
+    "shorturl.at", "tiny.cc", "lnkd.in", "tr.im", "v.gd",
+})
+
+_PHISH_KEYWORDS = frozenset({
+    "login", "signin", "verify", "verification", "secure",
+    "account", "update", "confirm", "wallet", "auth",
+    "bank", "password", "billing", "invoice", "unlock",
+    "suspended", "support",
+})
+
+_BRAND_KEYWORDS = frozenset({
+    "paypal", "microsoft", "google", "apple", "amazon",
+    "netflix", "facebook", "instagram", "twitter", "linkedin",
+    "github", "dropbox", "office365", "outlook", "icloud",
+    "chase", "wellsfargo", "bankofamerica", "coinbase",
+    "binance", "metamask",
+})
 
 
 class RequestInfo(TypedDict):
@@ -76,6 +114,13 @@ class PopupInfo(TypedDict):
     child_result: "SandboxResult | None"
 
 
+class LinkInfo(TypedDict):
+    url: str
+    host: str
+    suspicion_score: int  # 0-100; cheap URL-string heuristics only
+    reasons: list[str]
+
+
 class SandboxResult(TypedDict):
     url: str
     final_url: str
@@ -87,6 +132,10 @@ class SandboxResult(TypedDict):
     external_domains: list[str]
     num_requests_total: int
     network_requests: list[RequestInfo]
+    link_count_total: int  # all unique http(s) <a href> URLs on the page
+    link_count_external: int  # subset of the above with a different host
+    link_targets: list[LinkInfo]  # external links, sorted by suspicion desc
+    suspicious_links: list[LinkInfo]  # subset of link_targets with score > 0
     error: str | None
 
 
@@ -187,6 +236,7 @@ async def _capture_impl(
     downloads: list[DownloadInfo] = []
     dialog_popups: list[PopupInfo] = []
     new_tab_pages: list[Page] = []
+    raw_hrefs: list[str] = []
 
     screenshot_b64: str | None = None
     final_url = url
@@ -260,6 +310,14 @@ async def _capture_impl(
                 page_title = await page.title()
             except PlaywrightError:
                 page_title = ""
+            try:
+                raw_hrefs = await page.eval_on_selector_all(
+                    "a[href]", "els => els.map(e => e.href)"
+                )
+                if not isinstance(raw_hrefs, list):
+                    raw_hrefs = []
+            except PlaywrightError:
+                raw_hrefs = []
 
         except PlaywrightTimeoutError as exc:
             error = f"timeout after {timeout_ms}ms: {exc}"
@@ -324,6 +382,13 @@ async def _capture_impl(
         }
     )
 
+    (
+        link_targets,
+        suspicious_links,
+        link_count_total,
+        link_count_external,
+    ) = _build_link_lists(raw_hrefs, origin_host)
+
     return SandboxResult(
         url=url,
         final_url=final_url,
@@ -335,6 +400,10 @@ async def _capture_impl(
         external_domains=external_domains,
         num_requests_total=num_requests_total,
         network_requests=network_requests,
+        link_count_total=link_count_total,
+        link_count_external=link_count_external,
+        link_targets=link_targets,
+        suspicious_links=suspicious_links,
         error=error,
     )
 
@@ -345,6 +414,145 @@ def _collect_redirect_chain(response_urls: list[str]) -> list[str]:
         if not chain or chain[-1] != url:
             chain.append(url)
     return chain
+
+
+def _is_ip_literal(host: str) -> bool:
+    """Cheap IPv4 literal check (strips port if present)."""
+    bare = host.split(":")[0]
+    parts = bare.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        return all(0 <= int(p) <= 255 for p in parts)
+    except ValueError:
+        return False
+
+
+def _score_link_suspicion(url: str, host: str) -> tuple[int, list[str]]:
+    """Heuristic 0-100 suspicion score plus a list of reason tags.
+
+    Pure URL-string analysis: no DNS, no fetching. Designed to surface
+    common phishing patterns (typosquats, IDN homoglyphs, suspicious
+    TLDs, brand-in-subdomain, IP literals, URL shorteners, etc).
+    """
+    score = 0
+    reasons: list[str] = []
+
+    parsed = urlparse(url)
+    host_lower = host.lower()
+    netloc_lower = (parsed.netloc or "").lower()
+    path_lower = (parsed.path or "").lower()
+
+    if "@" in netloc_lower:
+        score += 50
+        reasons.append("userinfo_in_url")
+
+    if host_lower and _is_ip_literal(host_lower):
+        score += 40
+        reasons.append("ip_literal_host")
+
+    if host_lower.startswith("xn--") or ".xn--" in host_lower:
+        score += 30
+        reasons.append("punycode_host")
+
+    if "." in host_lower:
+        tld = host_lower.rsplit(".", 1)[-1]
+        if tld in _SUSPICIOUS_TLDS:
+            score += 25
+            reasons.append(f"suspicious_tld:{tld}")
+
+    if host_lower in _URL_SHORTENERS:
+        score += 15
+        reasons.append("url_shortener")
+
+    url_len = len(url)
+    if url_len > 200:
+        score += 20
+        reasons.append("very_long_url")
+    elif url_len > 100:
+        score += 10
+        reasons.append("long_url")
+
+    labels = [lbl for lbl in host_lower.split(".") if lbl]
+    if len(labels) > 4:
+        score += 20
+        reasons.append("many_subdomains")
+
+    if any(kw in host_lower for kw in _PHISH_KEYWORDS):
+        score += 20
+        reasons.append("phish_keyword_in_host")
+
+    phish_in_path = sum(1 for kw in _PHISH_KEYWORDS if kw in path_lower)
+    if phish_in_path:
+        score += min(15, 5 * phish_in_path)
+        reasons.append("phish_keyword_in_path")
+
+    # Brand-in-subdomain: e.g. paypal.attacker.com — labels[:-2] is the
+    # rough subdomain portion (good enough for .com/.org/.net; fuzzy on
+    # multi-part TLDs like .co.uk, but acceptable for hackathon-grade
+    # heuristics).
+    if len(labels) >= 3:
+        for label in labels[:-2]:
+            if label in _BRAND_KEYWORDS:
+                score += 50
+                reasons.append(f"brand_in_subdomain:{label}")
+                break
+
+    if parsed.port and parsed.port not in (80, 443):
+        score += 10
+        reasons.append(f"non_standard_port:{parsed.port}")
+
+    if url.count("%") > 5:
+        score += 10
+        reasons.append("heavy_url_encoding")
+
+    return min(score, 100), reasons
+
+
+def _build_link_lists(
+    hrefs: list[str], origin_host: str
+) -> tuple[list[LinkInfo], list[LinkInfo], int, int]:
+    """Dedupe, filter, score, and rank ``<a href>`` targets.
+
+    Returns ``(link_targets, suspicious_links, total_unique, external_unique)``.
+    Internal navigation (same host as origin) is counted but dropped from
+    the returned link lists since it's high-noise / low-signal for phishing.
+    """
+    seen: set[str] = set()
+    external_links: list[LinkInfo] = []
+    total_unique = 0
+    origin_lower = origin_host.lower()
+
+    for raw in hrefs[:MAX_RAW_HREFS]:
+        if not isinstance(raw, str):
+            continue
+        if not raw.startswith(("http://", "https://")):
+            continue
+        if raw in seen:
+            continue
+        seen.add(raw)
+        total_unique += 1
+
+        host = (urlparse(raw).hostname or "").lower()
+        if not host or host == origin_lower:
+            continue
+
+        score, reasons = _score_link_suspicion(raw, host)
+        external_links.append(
+            LinkInfo(
+                url=raw,
+                host=host,
+                suspicion_score=score,
+                reasons=reasons,
+            )
+        )
+
+    external_links.sort(key=lambda li: (-li["suspicion_score"], li["url"]))
+    targets = external_links[:MAX_LINK_TARGETS]
+    suspicious = [li for li in external_links if li["suspicion_score"] > 0][
+        :MAX_SUSPICIOUS_LINKS
+    ]
+    return targets, suspicious, total_unique, len(external_links)
 
 
 async def _cli(url: str, out: Path | None) -> None:

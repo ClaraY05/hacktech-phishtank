@@ -166,8 +166,32 @@ class SandboxResult(TypedDict):
     external_domains: list[str]
     num_requests_total: int
     network_requests: list[RequestInfo]  # capped at 150, filtered
+    link_count_total: int       # all unique http(s) <a href> on the page
+    link_count_external: int    # subset with a different host than origin
+    link_targets: list[LinkInfo]      # external links, ranked by suspicion
+    suspicious_links: list[LinkInfo]  # subset of link_targets w/ score > 0
     error: str | None
 ```
+
+`LinkInfo` carries cheap URL-string suspicion analysis (no extra browsing,
+no DNS, no fetching):
+
+```python
+class LinkInfo(TypedDict):
+    url: str
+    host: str
+    suspicion_score: int   # 0-100
+    reasons: list[str]     # e.g. ["brand_in_subdomain:paypal", "suspicious_tld:tk"]
+```
+
+Heuristics fired include: IP-literal hosts, `user@host` URL-trick,
+punycode / IDN homoglyphs, suspicious TLDs (`.tk`, `.xyz`, etc.),
+known URL shorteners, very long URLs, many subdomains, phish keywords
+in host or path, brand-in-subdomain (e.g. `paypal.attacker.com`),
+non-default ports, heavy URL encoding. K2 sees the full
+`suspicious_links` list and is told to weight it heavily — this catches
+pages whose own screenshot looks innocent but whose external links
+point to obvious phishing destinations.
 
 `POST /analyze-link` calls it directly, so the caller never has to
 supply a screenshot.

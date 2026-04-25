@@ -92,6 +92,7 @@ async def analyze_link(
 
 _MAX_NETWORK_REQUESTS_IN_PROMPT = 20
 _MAX_EXTERNAL_DOMAINS_IN_PROMPT = 15
+_MAX_LINK_TARGETS_IN_PROMPT = 30
 
 
 def _summarize_sandbox_signals(
@@ -114,6 +115,12 @@ def _summarize_sandbox_signals(
         kept = domains[:_MAX_EXTERNAL_DOMAINS_IN_PROMPT]
         trimmed["external_domains_total"] = len(domains)
         trimmed["external_domains"] = kept
+
+    targets = trimmed.get("link_targets")
+    if isinstance(targets, list) and len(targets) > _MAX_LINK_TARGETS_IN_PROMPT:
+        kept = targets[:_MAX_LINK_TARGETS_IN_PROMPT]
+        trimmed["link_targets"] = kept
+        trimmed["link_targets_omitted"] = len(targets) - len(kept)
 
     return trimmed
 
@@ -158,6 +165,14 @@ Score guidance:
 Treat the Gemma vision score as a strong prior but reason about the URL
 and any sandbox signals as well. If signals disagree, briefly acknowledge
 that in the explanation.
+
+Pay particular attention to ``sandbox_signals.suspicious_links``: these
+are external ``<a href>`` targets the page links to that already tripped
+URL-string heuristics (typosquats, IDN homoglyphs, suspicious TLDs,
+brand-in-subdomain, IP literals, URL shorteners). A page that itself
+looks innocent but links out to multiple suspicious destinations is a
+common phishing pattern and should be treated as MEDIUM or HIGH risk
+even if the screenshot looks clean.
 """
 
 
