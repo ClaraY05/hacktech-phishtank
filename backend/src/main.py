@@ -1,6 +1,11 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Safe Link Backend")
 
@@ -33,6 +38,12 @@ def health() -> dict[str, str]:
 
 @app.post("/analyze-links")
 def analyze_links(payload: AnalyzeLinksRequest) -> dict:
+    # logger.info("Received page_url=%s  link_count=%d", payload.page_url, len(payload.links))
+    # logger.info("  dom_signals=%s  html_chars=%d  content_hash_hint=%s",
+    #             payload.dom_signals, len(payload.sanitized_html_excerpt or ""), payload.content_hash_hint)
+    # for link in payload.links:
+    #     logger.info("  url=%s  text=%r", link.url, link.text)
+
     unique_urls = list(dict.fromkeys(str(link.url) for link in payload.links))
     dom_signals = payload.dom_signals or {}
     html_excerpt = payload.sanitized_html_excerpt or ""
