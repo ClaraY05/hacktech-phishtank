@@ -4,7 +4,7 @@ const ACTIVATION_STORAGE_KEY = "aiSafeLinkIsActive";
 
 // Local testing override for corner bubble state.
 // Set to "enabled", "disabled", or "analyzing" when testing.
-const LOCAL_BUBBLE_STATE_OVERRIDE: BubbleState | null = "enabled";
+const LOCAL_BUBBLE_STATE_OVERRIDE: BubbleState | null = "analyzing";
 
 let storageSyncInitialized = false;
 let isFeatureActive = true;
@@ -12,7 +12,23 @@ let activationStateInitialized = false;
 let bubbleState: BubbleState = "enabled";
 let onStateChange: (() => void) | null = null;
 
+function emitUiStateChange(): void {
+  chrome.runtime.sendMessage(
+    {
+      type: "UI_STATE_CHANGE",
+      state: bubbleState,
+    },
+    () => {
+      // Ignore failures when background is unavailable.
+      if (chrome.runtime.lastError) {
+        return;
+      }
+    },
+  );
+}
+
 function notifyStateChange(): void {
+  emitUiStateChange();
   onStateChange?.();
 }
 
