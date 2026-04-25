@@ -11,7 +11,7 @@ export function sendAnalyzeLinksMessage(payload: AnalyzeLinksMessage): Promise<A
     chrome.runtime.sendMessage(payload, (response: AnalyzeLinksResponse | undefined) => {
       if (chrome.runtime.lastError) {
         const errorMessage = chrome.runtime.lastError.message;
-        console.error("AI Safe Link message error:", errorMessage);
+        console.error("PhishTank message error:", errorMessage);
         resolve({ ok: false, error: errorMessage });
         return;
       }

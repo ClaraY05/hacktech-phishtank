@@ -1,3 +1,6 @@
+export const styleTokens = `
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
 :root {
   --yellow: #f5b301;
   --yellow-light: rgba(245, 179, 1, 0.12);
@@ -15,3 +18,4 @@
   --faint: #9e9a94;
   --border: rgba(0, 0, 0, 0.08);
 }
+`;

@@ -4,6 +4,7 @@ import type { BubbleState } from "../content/helper/uiConstants";
 const POPUP_WINDOW_WIDTH = 420;
 const POPUP_WINDOW_HEIGHT = 560;
 let popupWindowId: number | null = null;
+let latestUiState: BubbleState = "enabled";
 const TOOLBAR_STATE_COLORS: Record<BubbleState, string> = {
   analyzing: "#e8472f",
   enabled: "#0a8c7a",
@@ -35,6 +36,7 @@ function buildDotIconImageData(size: number, color: string): ImageData {
 }
 
 async function setToolbarStateDot(state: BubbleState): Promise<void> {
+  latestUiState = state;
   const color = TOOLBAR_STATE_COLORS[state];
   await chrome.action.setBadgeText({ text: "" });
   await chrome.action.setIcon({
@@ -71,7 +73,7 @@ async function openOrFocusExtensionWindow(): Promise<void> {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("AI Safe Link extension installed.");
+  console.log("PhishTank extension installed.");
   void setToolbarStateDot("enabled");
 });
 
@@ -88,6 +90,11 @@ chrome.windows.onRemoved.addListener((windowId) => {
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "GET_UI_STATE") {
+    sendResponse({ ok: true, state: latestUiState });
+    return;
+  }
+
   if (message?.type === "UI_STATE_CHANGE") {
     const nextState = message.state as BubbleState;
     if (nextState === "enabled" || nextState === "disabled" || nextState === "analyzing") {

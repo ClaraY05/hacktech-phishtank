@@ -4,7 +4,7 @@ const ACTIVATION_STORAGE_KEY = "aiSafeLinkIsActive";
 
 // Local testing override for corner bubble state.
 // Set to "enabled", "disabled", or "analyzing" when testing.
-const LOCAL_BUBBLE_STATE_OVERRIDE: BubbleState | null = "analyzing";
+const LOCAL_BUBBLE_STATE_OVERRIDE: BubbleState | null = "enabled";
 
 let storageSyncInitialized = false;
 let isFeatureActive = true;
@@ -99,7 +99,7 @@ export async function initializeFeatureActivationState(): Promise<boolean> {
       isFeatureActive = true;
     }
   } catch (error) {
-    console.warn("AI Safe Link: failed to read activation state", error);
+    console.warn("PhishTank: failed to read activation state", error);
     isFeatureActive = true;
   }
 
@@ -134,7 +134,7 @@ export async function setFeatureActivation(nextValue: boolean): Promise<void> {
   try {
     await chrome.storage.local.set({ [ACTIVATION_STORAGE_KEY]: nextValue });
   } catch (error) {
-    console.warn("AI Safe Link: failed to persist activation state", error);
+    console.warn("PhishTank: failed to persist activation state", error);
   }
 }
 

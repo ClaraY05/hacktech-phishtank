@@ -1,6 +1,6 @@
 # Frontend Chrome Extension
 
-Manifest V3 Chrome extension scaffold for AI Safe Link Sandbox.
+Manifest V3 Chrome extension scaffold for PhishTank.
 
 ## Structure
 
@@ -69,10 +69,10 @@ Optional for faster iteration:
 
 - Confirm `manifest.json` points to `dist/content/index.js`.
 - In Chrome DevTools (on the target webpage), look for logs such as:
-  - `AI Safe Link content script injected`
-  - `AI Safe Link found <count> links on page`
+  - `PhishTank content script injected`
+  - `PhishTank found <count> links on page`
 - In DevTools Sources, check:
-  - `Content scripts -> AI Safe Link Sandbox -> dist/content/index.js`
+  - `Content scripts -> PhishTank -> dist/content/index.js`
 
 ## Current Visual Behavior
 

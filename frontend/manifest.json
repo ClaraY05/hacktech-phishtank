@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Safe Link Sandbox",
+  "name": "PhishTank",
   "version": "0.1.0",
   "description": "Scaffold extension for safe link analysis.",
   "permissions": ["storage", "activeTab", "scripting"],
@@ -28,6 +28,6 @@
     }
   ],
   "action": {
-    "default_title": "AI Safe Link"
+    "default_title": "PhishTank"
   }
 }
