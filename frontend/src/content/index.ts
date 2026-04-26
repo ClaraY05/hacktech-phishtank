@@ -6,7 +6,24 @@ import {
   initializeFeatureActivationState,
   showBadge,
 } from "./helper/styling";
-import { setPageContext } from "./helper/hoverAnalyzer";
+import { setPageContext, getAnalyzedResults } from "./helper/hoverAnalyzer";
+
+type DomSignals = ReturnType<typeof collectDomSignals>;
+
+let cachedDomSignals: DomSignals | null = null;
+let cachedTotalLinks = 0;
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "GET_PAGE_SUMMARY") {
+    sendResponse({
+      ok: true,
+      domSignals: cachedDomSignals,
+      totalLinks: cachedTotalLinks,
+      pageUrl: window.location.href,
+      analyzedResults: getAnalyzedResults(),
+    });
+  }
+});
 
 const MAX_HTML_CHARS = 200_000;
 const MAX_LINKS = 500;
@@ -95,6 +112,8 @@ async function runContentFlow(): Promise<void> {
   // Gemini's 15 RPM free-tier ceiling (see background/helper/rateLimiter.ts).
   console.log(`PhishTank found ${payloadLinks.length} links on page`);
   const domSignals = collectDomSignals(document);
+  cachedDomSignals = domSignals;
+  cachedTotalLinks = payloadLinks.length;
   const sanitizedHtmlExcerpt = sanitizeHtmlForAnalysis(document, MAX_HTML_CHARS);
   setPageContext({
     pageUrl: window.location.href,

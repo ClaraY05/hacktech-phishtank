@@ -27,7 +27,12 @@ export type HoverCallbacks = {
 
 let pageContext: PageContext | null = null;
 const resultByUrl = new Map<string, Promise<LinkAnalysisResult>>();
+const resolvedByUrl = new Map<string, LinkAnalysisResult>();
 const debounceTimers = new WeakMap<HTMLAnchorElement, number>();
+
+export function getAnalyzedResults(): LinkAnalysisResult[] {
+  return Array.from(resolvedByUrl.values());
+}
 
 export function setPageContext(ctx: PageContext): void {
   pageContext = ctx;
@@ -92,6 +97,7 @@ async function kickoffAnalysis(
 
   try {
     const result = await promise;
+    resolvedByUrl.set(url, result);
     callbacks.onResult(result);
   } catch (err) {
     callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
