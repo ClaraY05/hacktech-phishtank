@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Edge cases — AI Safe Link test</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.6;
+      }
+      a {
+        color: #0b57d0;
+      }
+      code {
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <p><a href="index.html">← Index</a></p>
+    <h1>Edge cases</h1>
+    <ul>
+      <li><a href="mailto:test@example.com?subject=safe">mailto:test@example.com</a></li>
+      <li><a href="tel:+15555550123">tel:+15555550123</a> (fictional test number)</li>
+      <li><a href="#section-below">Same-page fragment</a></li>
+      <li><a href="https://example.com/a">Same href twice</a> / <a href="https://example.com/a">duplicate</a></li>
+      <li><a href="https://example.com/very/long/path/segment/segment/segment?q=1">Very long URL text wrapped in one link</a></li>
+      <li><a href="https://example.com/empty-label" aria-label="Label only in aria"></a> (empty visible text)</li>
+      <li>
+        <a href="javascript:void(0)">javascript:void(0)</a> (no navigation; for discovery behavior only)
+      </li>
+    </ul>
+    <h2 id="section-below">Fragment target</h2>
+    <p>You jumped here from the fragment link above.</p>
+  </body>
+</html>

@@ -103,4 +103,21 @@ export const styleCards = `
   display: flex; justify-content: space-between; gap: 8px; font-size: 10px;
   text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0 2px 8px;
 }
+.metric-wide { grid-column: 1 / -1; }
+.signals-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px;
+}
+.signal-item {
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(255,255,255,0.6); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 8px; font-size: 11px;
+}
+.signal-label { color: var(--muted); }
+.signal-value { font-weight: 600; color: var(--ink); }
+.keywords-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.keyword-chip {
+  background: var(--coral-light); border: 1px solid var(--coral-border);
+  color: var(--coral); border-radius: 99px; padding: 2px 8px;
+  font-size: 10px; font-weight: 600;
+}
 `;

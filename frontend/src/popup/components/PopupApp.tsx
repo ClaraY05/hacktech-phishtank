@@ -40,9 +40,17 @@ export function getPopupMarkup(): string {
                 <div class="metric"><div class="metric-label">Yellow (4-7)</div><div id="yellowCount" class="metric-value metric-yellow">0</div></div>
                 <div class="metric"><div class="metric-label">Green (8-10)</div><div id="greenCount" class="metric-value metric-green">0</div></div>
                 <div class="metric"><div class="metric-label">Total</div><div id="totalCount" class="metric-value">0</div></div>
+                <div class="metric metric-wide"><div class="metric-label">Avg Score</div><div id="avgScore" class="metric-value">—</div></div>
               </div>
             </div>
             <div id="explanationText" class="explanation-box">Waiting for analysis summary...</div>
+            <div class="signals-grid">
+              <div class="signal-item"><span class="signal-label">Forms</span><span id="numForms" class="signal-value">—</span></div>
+              <div class="signal-item"><span class="signal-label">iFrames</span><span id="numIframes" class="signal-value">—</span></div>
+              <div class="signal-item"><span class="signal-label">Ext. Scripts</span><span id="numExtScripts" class="signal-value">—</span></div>
+              <div class="signal-item"><span class="signal-label">Password Form</span><span id="hasPasswordForm" class="signal-value">—</span></div>
+            </div>
+            <div id="suspiciousKeywords" class="keywords-row is-hidden"></div>
           </div>
         </div>
 

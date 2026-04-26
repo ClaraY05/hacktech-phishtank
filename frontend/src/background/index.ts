@@ -106,6 +106,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return;
   }
 
+  if (message?.type === "GET_PAGE_SUMMARY") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0]?.id;
+      if (tabId === undefined) {
+        sendResponse({ ok: false, error: "No active tab" });
+        return;
+      }
+      chrome.tabs.sendMessage(tabId, { type: "GET_PAGE_SUMMARY" }, (response) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        sendResponse(response ?? { ok: false, error: "No response from content script" });
+      });
+    });
+    return true;
+  }
+
   if (message?.type === "ANALYZE_LINKS") {
     postAnalyzeLinks(message)
       .then((data) => {
