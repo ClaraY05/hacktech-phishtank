@@ -8,6 +8,7 @@ const POPUP_WINDOW_WIDTH = 420;
 const POPUP_WINDOW_HEIGHT = 560;
 const BASE_ICON_PATH = "src/fih_icons/fih_icon.png";
 let popupWindowId: number | null = null;
+let summaryTabId: number | null = null;
 let latestUiState: BubbleState = "enabled";
 const baseIconCache = new Map<number, ImageData>();
 const TOOLBAR_STATE_COLORS: Record<BubbleState, string> = {
@@ -144,12 +145,39 @@ async function openOrFocusExtensionWindow(): Promise<void> {
   popupWindowId = created.id ?? null;
 }
 
+async function resolveSummaryTabId(): Promise<number | null> {
+  if (summaryTabId !== null) {
+    try {
+      await chrome.tabs.get(summaryTabId);
+      return summaryTabId;
+    } catch {
+      summaryTabId = null;
+    }
+  }
+
+  // Prefer the focused normal browser window (not the extension popup window).
+  const windows = await chrome.windows.getAll({
+    populate: true,
+    windowTypes: ["normal"],
+  });
+  const focusedNormal = windows.find((win) => win.focused) ?? windows[0];
+  const activeTab = focusedNormal?.tabs?.find((tab) => tab.active && tab.id !== undefined);
+
+  if (activeTab?.id !== undefined) {
+    summaryTabId = activeTab.id;
+    return activeTab.id;
+  }
+
+  return null;
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log("PhishTank extension installed.");
   void setToolbarStateDot("enabled");
 });
 
-chrome.action.onClicked.addListener(() => {
+chrome.action.onClicked.addListener((tab) => {
+  summaryTabId = tab.id ?? summaryTabId;
   void openOrFocusExtensionWindow();
 });
 
@@ -158,6 +186,12 @@ void setToolbarStateDot("enabled");
 chrome.windows.onRemoved.addListener((windowId) => {
   if (popupWindowId === windowId) {
     popupWindowId = null;
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (summaryTabId === tabId) {
+    summaryTabId = null;
   }
 });
 
@@ -176,20 +210,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "GET_PAGE_SUMMARY") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs[0]?.id;
-      if (tabId === undefined) {
-        sendResponse({ ok: false, error: "No active tab" });
-        return;
-      }
-      chrome.tabs.sendMessage(tabId, { type: "GET_PAGE_SUMMARY" }, (response) => {
-        if (chrome.runtime.lastError) {
-          sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+    void resolveSummaryTabId()
+      .then((tabId) => {
+        if (tabId === null) {
+          sendResponse({ ok: false, error: "No active browser tab" });
           return;
         }
-        sendResponse(response ?? { ok: false, error: "No response from content script" });
+        chrome.tabs.sendMessage(tabId, { type: "GET_PAGE_SUMMARY" }, (response) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          sendResponse(response ?? { ok: false, error: "No response from content script" });
+        });
+      })
+      .catch((error: unknown) => {
+        const text = error instanceof Error ? error.message : String(error);
+        sendResponse({ ok: false, error: text });
       });
-    });
     return true;
   }
 

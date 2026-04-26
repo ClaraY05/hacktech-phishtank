@@ -3,7 +3,7 @@ Gemma vision client (Google AI Studio / Gemini API).
 
 Thin async wrapper around Google's Generative Language API for the Gemma
 model family. Designed as the vision-preprocessing stage in the
-AI Safe Link pipeline:
+PhishTank pipeline:
 
     Playwright screenshot  ->  GemmaClient.score_screenshot  ->  K2 V2
 

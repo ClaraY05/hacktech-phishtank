@@ -1,33 +1,34 @@
 .ai-safe-link-highlight {
   position: relative;
-  outline: 2px solid transparent;
-  outline-offset: 2px;
+  border-radius: 4px;
+  /* Default pre-analysis color; switches to risk colors once scored. */
+  --risk-color: #3b82f6;
 }
 
 .ai-safe-link-highlight::before {
   content: "";
   position: absolute;
-  inset: -2px;
+  inset: -3px;
+  border-radius: 6px;
   pointer-events: none;
   opacity: 0;
-  --risk-color: #f5b301;
   background:
     linear-gradient(var(--risk-color), var(--risk-color)) top left / 0% 2px no-repeat,
-    linear-gradient(var(--risk-color), var(--risk-color)) bottom left / 0% 2px no-repeat,
-    linear-gradient(var(--risk-color), var(--risk-color)) top left / 2px 0% no-repeat,
-    linear-gradient(var(--risk-color), var(--risk-color)) top right / 2px 0% no-repeat;
-  transition: background-size 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
-}
-
-.ai-safe-link-highlight:hover,
-.ai-safe-link-highlight:focus-visible {
-  outline-color: var(--risk-color, #f5b301) !important;
+    linear-gradient(var(--risk-color), var(--risk-color)) top right / 2px 0% no-repeat,
+    linear-gradient(var(--risk-color), var(--risk-color)) bottom right / 0% 2px no-repeat,
+    linear-gradient(var(--risk-color), var(--risk-color)) bottom left / 2px 0% no-repeat;
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  transition:
+    background-size 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .ai-safe-link-highlight:hover::before,
 .ai-safe-link-highlight:focus-visible::before {
-  opacity: 1;
-  background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+  opacity: 0.98;
+  background-size: 100% 2px, 2px 100%, 100% 2px, 2px 100%;
+  box-shadow: 0 8px 18px -14px color-mix(in srgb, var(--risk-color) 65%, transparent);
 }
 
 .ai-safe-link-highlight[data-ai-risk="low"] { --risk-color: #22c55e; }

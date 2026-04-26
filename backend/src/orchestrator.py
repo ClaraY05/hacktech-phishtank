@@ -1,5 +1,5 @@
 """
-Two-stage AI orchestration for AI Safe Link Sandbox.
+Two-stage AI orchestration for PhishTank Sandbox.
 
 Pipeline:
     URL + screenshot  ->  GemmaClient.score_screenshot   (vision-only score)

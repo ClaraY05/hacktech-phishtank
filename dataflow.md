@@ -1,14 +1,14 @@
-# 🧠 AI Safe Link — Data Flow Specification
+# 🧠 PhishTank — Data Flow Specification
 
 ## Overview
-This document defines the end-to-end data flow and state management for each component in the AI Safe Link Chrome Extension:
+This document defines the end-to-end data flow and state management for each component in the PhishTank Chrome Extension:
 - Corner Bubble (Global State Controller)
 - Hover Tooltips (Per-Link Analysis UI)
 - Browser Popout (Detailed Summary UI)
 
 ---
 
-## 🔵 1. AI Safe Link Corner Bubble (Global Controller)
+## 🔵 1. PhishTank Corner Bubble (Global Controller)
 
 ### Purpose
 Controls global extension state and determines whether link-level analysis is active.

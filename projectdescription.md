@@ -1,7 +1,7 @@
-# AI Safe Link Sandbox — Project Description
+# PhishTank Sandbox — Project Description
 
 ## 🌐 Overview
-AI Safe Link Sandbox is a browser-integrated security system that allows users to preview and analyze potentially dangerous links before clicking them. The system combines a Chrome extension, a sandboxed browser execution environment, and an AI reasoning model to deliver real-time safety scores and explanations.
+PhishTank Sandbox is a browser-integrated security system that allows users to preview and analyze potentially dangerous links before clicking them. The system combines a Chrome extension, a sandboxed browser execution environment, and an AI reasoning model to deliver real-time safety scores and explanations.
 
 Instead of requiring users to open a link and risk exposure, the system simulates link behavior in a controlled environment and explains what would have happened if the user clicked it.
 

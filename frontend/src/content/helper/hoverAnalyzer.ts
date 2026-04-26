@@ -78,7 +78,7 @@ async function kickoffAnalysis(
   callbacks: HoverCallbacks,
 ): Promise<void> {
   if (!pageContext) {
-    console.warn("AI Safe Link: page context not set; skipping hover analysis");
+    console.warn("PhishTank: page context not set; skipping hover analysis");
     return;
   }
 

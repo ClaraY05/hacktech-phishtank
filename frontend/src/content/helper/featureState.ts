@@ -42,7 +42,8 @@ function syncBubbleStateFromActivation(): void {
     isFeatureActive = bubbleState !== "disabled";
     return;
   }
-  bubbleState = backendAnalyzing ? "analyzing" : isFeatureActive ? "enabled" : "disabled";
+  // Disabled must win over backend "analyzing" so user toggle is always respected.
+  bubbleState = isFeatureActive ? (backendAnalyzing ? "analyzing" : "enabled") : "disabled";
 }
 
 function refreshState(): void {
@@ -155,7 +156,7 @@ export function setBadgeAnalyzing(isAnalyzing: boolean): void {
   if (LOCAL_BUBBLE_STATE_OVERRIDE) {
     bubbleState = LOCAL_BUBBLE_STATE_OVERRIDE;
   } else {
-    bubbleState = isAnalyzing ? "analyzing" : isFeatureActive ? "enabled" : "disabled";
+    bubbleState = isFeatureActive ? (isAnalyzing ? "analyzing" : "enabled") : "disabled";
   }
   notifyStateChange();
 }

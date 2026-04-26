@@ -1,4 +1,4 @@
-# AI Safe Link — local test pages
+# PhishTank — local test pages
 
 Static HTML only (no malware, no real phishing). External links use reserved documentation hosts ([RFC 2606](https://www.rfc-editor.org/rfc/rfc2606.html)) such as `example.com`.
 

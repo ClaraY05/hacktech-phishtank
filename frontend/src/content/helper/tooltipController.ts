@@ -1,5 +1,9 @@
 import { getBubbleState, isLinkUiEnabled } from "./featureState";
 import {
+  RISK_ATTR,
+  RISK_HIGH,
+  RISK_LOW,
+  RISK_MEDIUM,
   TOOLTIP_ANALYZING_CLASS,
   TOOLTIP_ATTR,
   TOOLTIP_GAP_PX,
@@ -56,6 +60,15 @@ export function showTooltip(link: HTMLAnchorElement): void {
 
   const tooltip = ensureTooltipElement();
   tooltip.textContent = text;
+  tooltip.classList.remove("is-risk-low", "is-risk-medium", "is-risk-high");
+  const risk = link.getAttribute(RISK_ATTR);
+  if (risk === RISK_LOW) {
+    tooltip.classList.add("is-risk-low");
+  } else if (risk === RISK_MEDIUM) {
+    tooltip.classList.add("is-risk-medium");
+  } else if (risk === RISK_HIGH) {
+    tooltip.classList.add("is-risk-high");
+  }
   if (getBubbleState() === "analyzing") {
     tooltip.classList.add(TOOLTIP_ANALYZING_CLASS);
   } else {

@@ -1,4 +1,4 @@
-# AI Safe Link Sandbox
+# PhishTank Sandbox
 
 This repository is split into two sections:
 
@@ -7,7 +7,7 @@ This repository is split into two sections:
 
 ## Project Context
 
-AI Safe Link Sandbox analyzes links before users click them. The extension discovers links and requests analysis from the backend. The backend is intended to orchestrate sandbox execution and AI reasoning (including K2 Think V2 integration).
+PhishTank Sandbox analyzes links before users click them. The extension discovers links and requests analysis from the backend. The backend is intended to orchestrate sandbox execution and AI reasoning (including K2 Think V2 integration).
 
 ## Repository Layout
 

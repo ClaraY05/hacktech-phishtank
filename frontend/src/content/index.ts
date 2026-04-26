@@ -123,7 +123,7 @@ async function runContentFlow(): Promise<void> {
   });
 
   console.log(
-    `AI Safe Link ready — ${payloadLinks.length} links found; analysis fires on hover`,
+    `PhishTank ready — ${payloadLinks.length} links found; analysis fires on hover`,
   );
 }
 

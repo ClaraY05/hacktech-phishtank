@@ -14,6 +14,7 @@ type DomSignals = {
 type AnalyzedResult = {
   url: string;
   score: number;
+  explanation?: string;
 };
 
 type PageSummary = {
@@ -25,7 +26,10 @@ type PageSummary = {
 type LinkAnalysisItem = {
   url: string;
   rating: number;
+  explanation: string;
 };
+
+let expandedLinkUrl: string | null = null;
 
 const rootEl = document.getElementById("popupRoot");
 if (rootEl) {
@@ -53,7 +57,8 @@ const hasPasswordFormEl = document.getElementById("hasPasswordForm");
 const suspiciousKeywordsEl = document.getElementById("suspiciousKeywords");
 
 function scoreToRating(score: number): number {
-  return Math.max(1, Math.min(10, 10 - Math.round(score / 11)));
+  // Keep popup bucket math aligned with content hover risk classification.
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 function setAnalyzingTextAnimation(): void {
@@ -93,7 +98,7 @@ function getBucketCounts(items: LinkAnalysisItem[]): { red: number; yellow: numb
 function buildAvgScore(items: LinkAnalysisItem[]): string {
   if (items.length === 0) return "—";
   const avg = items.reduce((sum, i) => sum + i.rating, 0) / items.length;
-  return `${avg.toFixed(1)} / 10`;
+  return `${avg.toFixed(1)} / 100`;
 }
 
 function buildExplanation(red: number, yellow: number, green: number, total: number): string {
@@ -142,16 +147,30 @@ function renderTable(items: LinkAnalysisItem[]): void {
   linkTableEl.innerHTML = items
     .map((item) => {
       const chipClass = item.rating >= 67 ? "danger" : item.rating >= 34 ? "warn" : "live";
+      const isExpanded = expandedLinkUrl === item.url;
+      const toggleLabel = isExpanded ? "Hide reason" : "View reason";
+      const safeExplanation = item.explanation || "No reason provided.";
       return `
-        <div class="item">
+        <div class="item ${isExpanded ? "is-expanded" : ""}" data-link-url="${item.url}">
           <div class="item-row">
             <span class="item-url mono" title="${item.url}">${item.url}</span>
             <span class="chip ${chipClass}">${item.rating}/100</span>
           </div>
+          <button type="button" class="item-toggle">${toggleLabel}</button>
+          <div class="item-reason">${safeExplanation}</div>
         </div>
       `;
     })
     .join("");
+
+  linkTableEl.querySelectorAll<HTMLElement>(".item").forEach((row) => {
+    row.addEventListener("click", () => {
+      const url = row.dataset.linkUrl;
+      if (!url) return;
+      expandedLinkUrl = expandedLinkUrl === url ? null : url;
+      renderTable(items);
+    });
+  });
 }
 
 function renderSignals(domSignals: DomSignals | null): void {
@@ -197,6 +216,7 @@ function renderDashboard(state: BubbleState, summary: PageSummary): void {
   const items: LinkAnalysisItem[] = summary.analyzedResults.map((r) => ({
     url: r.url,
     rating: scoreToRating(r.score),
+    explanation: r.explanation ?? "No reason provided.",
   }));
 
   const { red, yellow, green, total } = getBucketCounts(items);
@@ -221,17 +241,20 @@ function renderDashboard(state: BubbleState, summary: PageSummary): void {
 }
 
 function renderForState(state: BubbleState): void {
-  const isAnalyzing = state === "analyzing";
+  void fetchPageSummary().then((summary) => {
+    const hasCachedAnalyzedLinks = summary.analyzedResults.length > 0;
+    const showAnalyzingView = state === "analyzing" && !hasCachedAnalyzedLinks;
 
-  if (analyzingViewEl) analyzingViewEl.classList.toggle("is-hidden", !isAnalyzing);
-  if (dashboardViewEl) dashboardViewEl.classList.toggle("is-hidden", isAnalyzing);
+    if (analyzingViewEl) analyzingViewEl.classList.toggle("is-hidden", !showAnalyzingView);
+    if (dashboardViewEl) dashboardViewEl.classList.toggle("is-hidden", showAnalyzingView);
 
-  if (isAnalyzing) {
-    setAnalyzingTextAnimation();
-    return;
-  }
+    if (showAnalyzingView) {
+      setAnalyzingTextAnimation();
+      return;
+    }
 
-  void fetchPageSummary().then((summary) => renderDashboard(state, summary));
+    renderDashboard(state, summary);
+  });
 }
 
 function renderCurrentUrl(): void {

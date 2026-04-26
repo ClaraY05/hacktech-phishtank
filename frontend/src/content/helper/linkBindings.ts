@@ -8,7 +8,7 @@ let dynamicBindingInitialized = false;
 let linkMutationObserver: MutationObserver | null = null;
 let activeHoverLink: HTMLAnchorElement | null = null;
 
-const ANALYZING_TOOLTIP_TEXT = "AI Safe Link: analyzing this link…";
+const ANALYZING_TOOLTIP_TEXT = "PhishTank: analyzing this link…";
 
 function refreshTooltipIfActive(link: HTMLAnchorElement): void {
   if (activeHoverLink === link) {
@@ -31,7 +31,7 @@ function triggerAnalysisAndRefresh(link: HTMLAnchorElement): void {
       refreshTooltipIfActive(link);
     },
     onError: (err) => {
-      link.setAttribute(TOOLTIP_ATTR, `AI Safe Link: analysis failed — ${err.message}`);
+      link.setAttribute(TOOLTIP_ATTR, `PhishTank: analysis failed — ${err.message}`);
       refreshTooltipIfActive(link);
     },
   });

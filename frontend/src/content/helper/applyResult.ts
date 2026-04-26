@@ -7,7 +7,7 @@ import {
   TOOLTIP_ATTR,
 } from "./uiConstants";
 
-const FALLBACK_TOOLTIP_TEXT = "AI Safe Link: no analysis details available.";
+const FALLBACK_TOOLTIP_TEXT = "PhishTank: no analysis details available.";
 
 export function riskClass(result: LinkAnalysisResult): string {
   if (result.risk === "HIGH") return RISK_HIGH;

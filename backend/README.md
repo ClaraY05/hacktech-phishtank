@@ -1,6 +1,6 @@
 # Backend
 
-Python backend scaffold for AI Safe Link Sandbox.
+Python backend scaffold for PhishTank Sandbox.
 
 ## Purpose
 

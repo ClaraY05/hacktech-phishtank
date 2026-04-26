@@ -1,4 +1,9 @@
-import { getBubbleState, setFeatureActivation, setStateChangeListener } from "./featureState";
+import {
+  getBubbleState,
+  isFeatureActivationEnabled,
+  setFeatureActivation,
+  setStateChangeListener,
+} from "./featureState";
 import { hideTooltip } from "./tooltipController";
 import { BADGE_ANALYZING_CLASS, BADGE_ID } from "./uiConstants";
 
@@ -112,10 +117,8 @@ function buildBadge(): HTMLDivElement {
     badge.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.2)";
   });
   badge.addEventListener("click", () => {
-    if (getBubbleState() === "analyzing") {
-      return;
-    }
-    void setFeatureActivation(getBubbleState() !== "enabled");
+    // Always allow user to disable, even while backend is currently analyzing.
+    void setFeatureActivation(!isFeatureActivationEnabled());
     hideTooltip();
   });
 

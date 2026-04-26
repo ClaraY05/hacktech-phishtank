@@ -1,5 +1,5 @@
 """
-Playwright sandbox capture for AI Safe Link.
+Playwright sandbox capture for PhishTank.
 
 Loads a URL in a headless Chromium and returns a structured ``SandboxResult``:
 the rendered screenshot (base64 PNG), redirect chain, page title, downloads

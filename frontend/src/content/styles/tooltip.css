@@ -20,6 +20,21 @@
   transition: opacity 0.12s ease;
 }
 
+.ai-safe-link-tooltip.is-risk-low {
+  background: linear-gradient(to right, rgba(15, 118, 110, 0.95), rgba(21, 128, 61, 0.9));
+  border: 1px solid rgba(34, 197, 94, 0.75);
+}
+
+.ai-safe-link-tooltip.is-risk-medium {
+  background: linear-gradient(to right, rgba(180, 83, 9, 0.95), rgba(202, 138, 4, 0.9));
+  border: 1px solid rgba(245, 179, 1, 0.8);
+}
+
+.ai-safe-link-tooltip.is-risk-high {
+  background: linear-gradient(to right, rgba(153, 27, 27, 0.96), rgba(185, 28, 28, 0.9));
+  border: 1px solid rgba(239, 68, 68, 0.85);
+}
+
 .ai-safe-link-tooltip.is-visible {
   opacity: 1;
 }

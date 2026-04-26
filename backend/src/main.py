@@ -1,4 +1,4 @@
-"""FastAPI app for AI Safe Link Sandbox.
+"""FastAPI app for PhishTank Sandbox.
 
 The request path is intentionally thin:
 
@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await backend.aclose()
 
 
-app = FastAPI(title="AI Safe Link Backend", lifespan=lifespan)
+app = FastAPI(title="PhishTank Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

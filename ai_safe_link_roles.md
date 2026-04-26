@@ -1,4 +1,4 @@
-AI Safe Link Sandbox — Role Definitions (Updated)
+PhishTank Sandbox — Role Definitions (Updated)
 
 1. Browser Extension Engineer (Frontend + UX Layer)
 
