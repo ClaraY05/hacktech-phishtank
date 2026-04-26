@@ -20,6 +20,7 @@ import base64
 import json
 import logging
 import os
+import threading
 import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
@@ -119,6 +120,25 @@ class InvalidateRequest(BaseModel):
 
 _gemma_client: GemmaClient | None = None
 _k2_client: K2Client | None = None
+_active_analysis_jobs = 0
+_active_analysis_jobs_lock = threading.Lock()
+
+
+def _increment_active_analysis_jobs() -> None:
+    global _active_analysis_jobs
+    with _active_analysis_jobs_lock:
+        _active_analysis_jobs += 1
+
+
+def _decrement_active_analysis_jobs() -> None:
+    global _active_analysis_jobs
+    with _active_analysis_jobs_lock:
+        _active_analysis_jobs = max(0, _active_analysis_jobs - 1)
+
+
+def _get_active_analysis_jobs() -> int:
+    with _active_analysis_jobs_lock:
+        return _active_analysis_jobs
 
 
 def _get_gemma_client() -> GemmaClient:
@@ -140,6 +160,15 @@ def health() -> dict[str, str]:
     return {
         "status": "ok",
         "sandbox_backend": getattr(app.state.sandbox_backend, "name", "unknown"),
+    }
+
+
+@app.get("/analysis-status")
+def analysis_status() -> dict[str, Any]:
+    active_jobs = _get_active_analysis_jobs()
+    return {
+        "is_analyzing": active_jobs > 0,
+        "active_jobs": active_jobs,
     }
 
 
@@ -177,16 +206,21 @@ async def send_batch_links(payload: AnalyzeLinksRequest) -> StreamingResponse:
     backend: SandboxBackend = app.state.sandbox_backend
     cache: AnalysisCache = app.state.cache
 
+    _increment_active_analysis_jobs()
+
     async def event_stream():
-        async for result in process_links_stream(
-            unique_urls,
-            backend=backend,
-            cache=cache,
-            gemma=gemma,
-            k2=k2,
-        ):
-            yield f"data: {json.dumps(result)}\n\n"
-        yield 'data: {"done": true}\n\n'
+        try:
+            async for result in process_links_stream(
+                unique_urls,
+                backend=backend,
+                cache=cache,
+                gemma=gemma,
+                k2=k2,
+            ):
+                yield f"data: {json.dumps(result)}\n\n"
+            yield 'data: {"done": true}\n\n'
+        finally:
+            _decrement_active_analysis_jobs()
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -241,5 +275,9 @@ async def analyze_link_route(payload: AnalyzeLinkRequest) -> dict[str, Any]:
         )
         return analyzed.to_dict()
 
-    result, status = await cache.get_or_compute(key, factory)
-    return {**result, "_cache": status, "_cache_key": key}
+    _increment_active_analysis_jobs()
+    try:
+        result, status = await cache.get_or_compute(key, factory)
+        return {**result, "_cache": status, "_cache_key": key}
+    finally:
+        _decrement_active_analysis_jobs()

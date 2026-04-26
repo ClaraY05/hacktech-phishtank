@@ -1,16 +1,20 @@
 import { BubbleState, HIGHLIGHT_CLASS } from "./uiConstants";
 
 const ACTIVATION_STORAGE_KEY = "aiSafeLinkIsActive";
+const BACKEND_STATUS_POLL_MS = 1500;
 
 // Local testing override for corner bubble state.
 // Set to "enabled", "disabled", or "analyzing" when testing.
-const LOCAL_BUBBLE_STATE_OVERRIDE: BubbleState | null = "enabled";
+const LOCAL_BUBBLE_STATE_OVERRIDE: BubbleState | null = null;
 
 let storageSyncInitialized = false;
 let isFeatureActive = true;
 let activationStateInitialized = false;
 let bubbleState: BubbleState = "enabled";
 let onStateChange: (() => void) | null = null;
+let backendStatusSyncInitialized = false;
+let backendAnalyzing = false;
+let backendStatusPollInFlight = false;
 
 function emitUiStateChange(): void {
   chrome.runtime.sendMessage(
@@ -38,7 +42,7 @@ function syncBubbleStateFromActivation(): void {
     isFeatureActive = bubbleState !== "disabled";
     return;
   }
-  bubbleState = isFeatureActive ? "enabled" : "disabled";
+  bubbleState = backendAnalyzing ? "analyzing" : isFeatureActive ? "enabled" : "disabled";
 }
 
 function refreshState(): void {
@@ -85,6 +89,35 @@ function initializeStorageSync(): void {
   });
 }
 
+function pollBackendAnalyzingStatus(): void {
+  if (backendStatusPollInFlight) {
+    return;
+  }
+
+  backendStatusPollInFlight = true;
+  chrome.runtime.sendMessage(
+    { type: "GET_BACKEND_ANALYSIS_STATUS" },
+    (response: { ok?: boolean; isAnalyzing?: boolean } | undefined) => {
+      backendStatusPollInFlight = false;
+      const nextAnalyzing = response?.ok === true && response.isAnalyzing === true;
+      if (nextAnalyzing === backendAnalyzing) {
+        return;
+      }
+      backendAnalyzing = nextAnalyzing;
+      refreshState();
+    },
+  );
+}
+
+function initializeBackendStatusSync(): void {
+  if (backendStatusSyncInitialized) {
+    return;
+  }
+  backendStatusSyncInitialized = true;
+  pollBackendAnalyzingStatus();
+  window.setInterval(pollBackendAnalyzingStatus, BACKEND_STATUS_POLL_MS);
+}
+
 export async function initializeFeatureActivationState(): Promise<boolean> {
   if (activationStateInitialized) {
     return isFeatureActive;
@@ -105,6 +138,7 @@ export async function initializeFeatureActivationState(): Promise<boolean> {
 
   activationStateInitialized = true;
   initializeStorageSync();
+  initializeBackendStatusSync();
   refreshState();
   return isFeatureActive;
 }

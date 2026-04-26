@@ -28,3 +28,17 @@ export async function postAnalyzeLinks(message: AnalyzeLinksBackendRequest): Pro
 
   return response.json();
 }
+
+export async function getBackendAnalysisStatus(): Promise<{ isAnalyzing: boolean }> {
+  try {
+    const response = await fetch("http://127.0.0.1:8000/analysis-status");
+    if (!response.ok) {
+      return { isAnalyzing: false };
+    }
+
+    const data = (await response.json()) as { is_analyzing?: unknown };
+    return { isAnalyzing: data.is_analyzing === true };
+  } catch {
+    return { isAnalyzing: false };
+  }
+}

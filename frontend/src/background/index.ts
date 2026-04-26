@@ -1,4 +1,4 @@
-import { postAnalyzeLinks } from "./helper/apiClient";
+import { getBackendAnalysisStatus, postAnalyzeLinks } from "./helper/apiClient";
 import { streamBatchToCallback, type StreamPayload } from "./helper/streamProxy";
 
 const ANALYZE_PORT_NAME = "ai-safe-link-analyze";
@@ -204,6 +204,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       });
 
     // Keep the response channel open for async fetch completion.
+    return true;
+  }
+
+  if (message?.type === "GET_BACKEND_ANALYSIS_STATUS") {
+    getBackendAnalysisStatus()
+      .then((status) => {
+        sendResponse({ ok: true, isAnalyzing: status.isAnalyzing });
+      })
+      .catch(() => {
+        sendResponse({ ok: true, isAnalyzing: false });
+      });
     return true;
   }
 });
