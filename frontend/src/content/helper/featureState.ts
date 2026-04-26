@@ -55,11 +55,27 @@ export function isLinkUiEnabled(): boolean {
   return bubbleState !== "disabled";
 }
 
+// Returns the element that should receive the highlight class for a given anchor.
+// Title links (Google/Reddit search results) wrap a heading — highlight that so
+// the bracket sits around the visible text only, not the full anchor bounding box.
+// Site-card anchors (source/breadcrumb links) contain a visible favicon image but
+// no heading — return null to skip them.
+export function getHighlightTarget(link: HTMLAnchorElement): HTMLElement | null {
+  const heading = link.querySelector<HTMLElement>("h1,h2,h3,h4,h5,h6");
+  if (heading) return heading;
+  const img = link.querySelector("img");
+  if (img && img.offsetWidth > 12 && img.offsetHeight > 12) return null;
+  return link;
+}
+
 export function applyFeatureStateToLink(link: HTMLAnchorElement): void {
   if (isLinkUiEnabled()) {
-    link.classList.add(HIGHLIGHT_CLASS);
+    const target = getHighlightTarget(link);
+    if (target) target.classList.add(HIGHLIGHT_CLASS);
     return;
   }
+  const heading = link.querySelector<HTMLElement>("h1,h2,h3,h4,h5,h6");
+  if (heading) heading.classList.remove(HIGHLIGHT_CLASS);
   link.classList.remove(HIGHLIGHT_CLASS);
   link.removeAttribute("title");
 }
