@@ -1,4 +1,5 @@
 import { type LinkAnalysisResult } from "./batchStream";
+import { getHighlightTarget } from "./featureState";
 import {
   RISK_ATTR,
   RISK_HIGH,
@@ -23,8 +24,13 @@ export function applyResultToLink(
   link: HTMLAnchorElement,
   result: LinkAnalysisResult,
 ): void {
+  const risk = riskClass(result);
   const tooltipText = result.explanation || FALLBACK_TOOLTIP_TEXT;
   link.setAttribute(TOOLTIP_ATTR, tooltipText);
-  link.setAttribute(RISK_ATTR, riskClass(result));
+  link.setAttribute(RISK_ATTR, risk);
   link.removeAttribute("title");
+  // Propagate risk attribute to the highlight target (heading or link itself)
+  // so the CSS color selectors (.ai-safe-link-highlight[data-ai-risk="..."]) match.
+  const target = getHighlightTarget(link);
+  if (target && target !== link) target.setAttribute(RISK_ATTR, risk);
 }
