@@ -1,4 +1,4 @@
-import { scoreToRating, type LinkAnalysisResult } from "./batchStream";
+import { type LinkAnalysisResult } from "./batchStream";
 import {
   RISK_ATTR,
   RISK_HIGH,
@@ -13,9 +13,9 @@ export function riskClass(result: LinkAnalysisResult): string {
   if (result.risk === "HIGH") return RISK_HIGH;
   if (result.risk === "MEDIUM") return RISK_MEDIUM;
   if (result.risk === "LOW") return RISK_LOW;
-  const rating = scoreToRating(result.score);
-  if (rating >= 67) return RISK_HIGH;
-  if (rating >= 34) return RISK_MEDIUM;
+  // Fallback: score is 0–100 where higher = more risky.
+  if (result.score >= 67) return RISK_HIGH;
+  if (result.score >= 34) return RISK_MEDIUM;
   return RISK_LOW;
 }
 

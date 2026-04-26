@@ -32,7 +32,8 @@
         "src/content/styles/tokens.css",
         "src/content/styles/link-highlight.css",
         "src/content/styles/tooltip.css",
-        "src/content/styles/badge.css"
+        "src/content/styles/badge.css",
+        "src/content/styles/warning-modal.css"
       ],
       "matches": ["<all_urls>"]
     }
