@@ -2,7 +2,8 @@ import { applyFeatureStateToAllLinks, applyFeatureStateToLink } from "./featureS
 import { applyResultToLink } from "./applyResult";
 import { cancelHoverAnalysis, requestHoverAnalysis } from "./hoverAnalyzer";
 import { hideTooltip, showTooltip } from "./tooltipController";
-import { TOOLTIP_ATTR } from "./uiConstants";
+import { RISK_ATTR, RISK_HIGH, TOOLTIP_ATTR } from "./uiConstants";
+import { showWarningModal } from "./warningModal";
 
 let dynamicBindingInitialized = false;
 let linkMutationObserver: MutationObserver | null = null;
@@ -62,6 +63,15 @@ function bindLinkInteractions(link: HTMLAnchorElement): void {
   link.addEventListener("mouseleave", () => handleHoverLeave(link));
   link.addEventListener("focus", () => handleHoverEnter(link));
   link.addEventListener("blur", () => handleHoverLeave(link));
+  link.addEventListener("click", (e: MouseEvent) => {
+    // Allow modifier-key clicks (Ctrl/Cmd = new tab, Shift = new window) through unchanged.
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    if (link.getAttribute(RISK_ATTR) !== RISK_HIGH) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const explanation = link.getAttribute(TOOLTIP_ATTR) ?? "This link has been flagged as high-risk by PhishTank.";
+    showWarningModal(link, explanation);
+  });
 }
 
 function bindLinksInSubtree(root: ParentNode): void {
