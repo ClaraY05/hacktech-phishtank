@@ -33,7 +33,9 @@
         "src/content/styles/link-highlight.css",
         "src/content/styles/tooltip.css",
         "src/content/styles/badge.css",
-        "src/content/styles/warning-modal.css"
+        "src/content/styles/warning-modal.css",
+        "src/popup/popup.html",
+        "dist/popup/index.js"
       ],
       "matches": ["<all_urls>"]
     }

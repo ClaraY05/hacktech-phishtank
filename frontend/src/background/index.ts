@@ -1,8 +1,43 @@
 import { getBackendAnalysisStatus, postAnalyzeLinks } from "./helper/apiClient";
 import { streamBatchToCallback, type StreamPayload } from "./helper/streamProxy";
+import type { BubbleState } from "../content/helper/uiConstants";
 
 const ANALYZE_PORT_NAME = "ai-safe-link-analyze";
-import type { BubbleState } from "../content/helper/uiConstants";
+const POPUP_PORT_NAME = "ai-safe-link-popup";
+
+type LinkAnalysisResult = {
+  url: string;
+  risk: "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN";
+  score: number;
+  explanation: string;
+  key_signals: string[];
+  error?: string;
+};
+
+type TabSlot = { pageUrl: string; results: Map<string, LinkAnalysisResult> };
+const tabResults = new Map<number, TabSlot>();
+const popupPorts = new Set<chrome.runtime.Port>();
+
+function recordResult(tabId: number, pageUrl: string, data: unknown): void {
+  if (typeof data !== "object" || data === null) return;
+  const result = data as LinkAnalysisResult;
+  if (typeof result.url !== "string") return;
+
+  let slot = tabResults.get(tabId);
+  if (!slot || slot.pageUrl !== pageUrl) {
+    slot = { pageUrl, results: new Map() };
+    tabResults.set(tabId, slot);
+  }
+  slot.results.set(result.url, result);
+
+  for (const port of popupPorts) {
+    try {
+      port.postMessage({ type: "TAB_UPDATE", tabId, pageUrl, data: result });
+    } catch {
+      // popup closed mid-broadcast; cleaned up by onDisconnect
+    }
+  }
+}
 
 const POPUP_WINDOW_WIDTH = 420;
 const POPUP_WINDOW_HEIGHT = 560;
@@ -178,7 +213,15 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.action.onClicked.addListener((tab) => {
   summaryTabId = tab.id ?? summaryTabId;
-  void openOrFocusExtensionWindow();
+  if (tab.id === undefined) {
+    void openOrFocusExtensionWindow();
+    return;
+  }
+
+  chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_INLINE_POPUP" }, () => {
+    if (!chrome.runtime.lastError) return;
+    void openOrFocusExtensionWindow();
+  });
 });
 
 void setToolbarStateDot("enabled");
@@ -210,12 +253,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "GET_PAGE_SUMMARY") {
-    void resolveSummaryTabId()
+    const requestedTabId = typeof message.tabId === "number" ? message.tabId : null;
+    void (requestedTabId === null ? resolveSummaryTabId() : Promise.resolve(requestedTabId))
       .then((tabId) => {
         if (tabId === null) {
           sendResponse({ ok: false, error: "No active browser tab" });
           return;
         }
+        summaryTabId = tabId;
         chrome.tabs.sendMessage(tabId, { type: "GET_PAGE_SUMMARY" }, (response) => {
           if (chrome.runtime.lastError) {
             sendResponse({ ok: false, error: chrome.runtime.lastError.message });
@@ -255,6 +300,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       });
     return true;
   }
+
+  if (message?.type === "GET_TAB_RESULTS") {
+    const tabId = typeof message.tabId === "number" ? message.tabId : undefined;
+    if (tabId === undefined) {
+      sendResponse({ ok: false, error: "missing tabId" });
+      return;
+    }
+    const slot = tabResults.get(tabId);
+    sendResponse({
+      ok: true,
+      pageUrl: slot?.pageUrl ?? null,
+      results: slot ? Array.from(slot.results.values()) : [],
+    });
+    return;
+  }
 });
 
 // Streaming bridge for the content script. Content script can't fetch
@@ -262,10 +322,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // page-origin -> loopback. The SW runs in chrome-extension:// origin
 // which is exempt when manifest host_permissions lists the target.
 chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === POPUP_PORT_NAME) {
+    popupPorts.add(port);
+    port.onDisconnect.addListener(() => popupPorts.delete(port));
+    return;
+  }
+
   if (port.name !== ANALYZE_PORT_NAME) return;
 
   const controller = new AbortController();
   let started = false;
+  const senderTabId = port.sender?.tab?.id;
 
   port.onDisconnect.addListener(() => {
     controller.abort();
@@ -284,6 +351,9 @@ chrome.runtime.onConnect.addListener((port) => {
         } catch {
           // port already closed
           controller.abort();
+        }
+        if (senderTabId !== undefined) {
+          recordResult(senderTabId, payload.pageUrl, data);
         }
       },
       controller.signal,

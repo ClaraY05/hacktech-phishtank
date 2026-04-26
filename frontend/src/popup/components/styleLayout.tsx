@@ -5,7 +5,8 @@ body {
   font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--ink);
-  min-width: 420px;
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
 }
 .shell {
@@ -13,6 +14,7 @@ body {
   overflow: hidden;
   min-height: 100vh;
   padding: 14px;
+  border: 1px solid rgba(17, 17, 16, 0.1);
 }
 .shell::before {
   content: "";

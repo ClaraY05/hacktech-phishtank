@@ -23,6 +23,19 @@ type PageSummary = {
   analyzedResults: AnalyzedResult[];
 };
 
+type PageSummaryResponse = {
+  ok?: boolean;
+  domSignals?: DomSignals;
+  totalLinks?: number;
+  analyzedResults?: AnalyzedResult[];
+};
+
+type TabResultsResponse = {
+  ok?: boolean;
+  pageUrl?: string | null;
+  results?: AnalyzedResult[];
+};
+
 type LinkAnalysisItem = {
   url: string;
   rating: number;
@@ -30,6 +43,50 @@ type LinkAnalysisItem = {
 };
 
 let expandedLinkUrl: string | null = null;
+
+const POPUP_PORT_NAME = "ai-safe-link-popup";
+let currentState: BubbleState = "enabled";
+let currentTabId: number | null = null;
+let currentSummary: PageSummary = { domSignals: null, totalLinks: 0, analyzedResults: [] };
+let livePort: chrome.runtime.Port | null = null;
+let analyzingTimerId: number | null = null;
+
+type LiveUpdate = {
+  type: "TAB_UPDATE";
+  tabId: number;
+  pageUrl: string;
+  data: { url: string; score: number; explanation?: string };
+};
+
+function mergeLiveResult(data: LiveUpdate["data"]): void {
+  if (!isValidAnalyzedResult(data)) return;
+  const idx = currentSummary.analyzedResults.findIndex((r) => r.url === data.url);
+  const next: AnalyzedResult = {
+    url: data.url,
+    score: data.score,
+    explanation: data.explanation,
+  };
+  if (idx >= 0) currentSummary.analyzedResults[idx] = next;
+  else currentSummary.analyzedResults.push(next);
+}
+
+function subscribeToLiveUpdates(): void {
+  if (livePort || currentTabId === null) return;
+  try {
+    livePort = chrome.runtime.connect({ name: POPUP_PORT_NAME });
+  } catch {
+    return;
+  }
+  livePort.onMessage.addListener((msg: LiveUpdate) => {
+    if (msg?.type !== "TAB_UPDATE" || msg.tabId !== currentTabId) return;
+    mergeLiveResult(msg.data);
+    setViewMode(false);
+    renderDashboard(currentState, currentSummary);
+  });
+  livePort.onDisconnect.addListener(() => {
+    livePort = null;
+  });
+}
 
 const rootEl = document.getElementById("popupRoot");
 if (rootEl) {
@@ -61,8 +118,41 @@ function scoreToRating(score: number): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
+function isValidAnalyzedResult(value: unknown): value is AnalyzedResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as AnalyzedResult).url === "string" &&
+    typeof (value as AnalyzedResult).score === "number" &&
+    Number.isFinite((value as AnalyzedResult).score)
+  );
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
+}
+
+function setViewMode(showAnalyzingView: boolean): void {
+  if (analyzingViewEl) analyzingViewEl.classList.toggle("is-hidden", !showAnalyzingView);
+  if (dashboardViewEl) dashboardViewEl.classList.toggle("is-hidden", showAnalyzingView);
+}
+
 function setAnalyzingTextAnimation(): void {
   if (!analyzingStatusEl) return;
+  if (analyzingTimerId !== null) return;
 
   const variants = [
     "Extension active and monitoring links.",
@@ -71,7 +161,7 @@ function setAnalyzingTextAnimation(): void {
   let index = 0;
   analyzingStatusEl.textContent = variants[index];
 
-  window.setInterval(() => {
+  analyzingTimerId = window.setInterval(() => {
     index = (index + 1) % variants.length;
     analyzingStatusEl.textContent = variants[index];
   }, 700);
@@ -137,7 +227,7 @@ function renderTable(items: LinkAnalysisItem[]): void {
       <div class="item">
         <div class="item-row">
           <span class="item-url mono">No links available</span>
-          <span class="chip warn">0/10</span>
+          <span class="chip warn">0/100</span>
         </div>
       </div>
     `;
@@ -149,11 +239,12 @@ function renderTable(items: LinkAnalysisItem[]): void {
       const chipClass = item.rating >= 67 ? "danger" : item.rating >= 34 ? "warn" : "live";
       const isExpanded = expandedLinkUrl === item.url;
       const toggleLabel = isExpanded ? "Hide reason" : "View reason";
-      const safeExplanation = item.explanation || "No reason provided.";
+      const safeUrl = escapeHtml(item.url);
+      const safeExplanation = escapeHtml(item.explanation || "No reason provided.");
       return `
-        <div class="item ${isExpanded ? "is-expanded" : ""}" data-link-url="${item.url}">
+        <div class="item ${isExpanded ? "is-expanded" : ""}" data-link-url="${safeUrl}">
           <div class="item-row">
-            <span class="item-url mono" title="${item.url}">${item.url}</span>
+            <span class="item-url mono" title="${safeUrl}">${safeUrl}</span>
             <span class="chip ${chipClass}">${item.rating}/100</span>
           </div>
           <button type="button" class="item-toggle">${toggleLabel}</button>
@@ -188,7 +279,7 @@ function renderSignals(domSignals: DomSignals | null): void {
     if (keywords.length > 0) {
       suspiciousKeywordsEl.classList.remove("is-hidden");
       suspiciousKeywordsEl.innerHTML = keywords
-        .map((kw) => `<span class="keyword-chip">${kw}</span>`)
+        .map((kw) => `<span class="keyword-chip">${escapeHtml(kw)}</span>`)
         .join("");
     } else {
       suspiciousKeywordsEl.classList.add("is-hidden");
@@ -196,9 +287,23 @@ function renderSignals(domSignals: DomSignals | null): void {
   }
 }
 
-async function fetchPageSummary(): Promise<PageSummary> {
+function mergeAnalyzedResults(primary: AnalyzedResult[], secondary: AnalyzedResult[]): AnalyzedResult[] {
+  const byUrl = new Map<string, AnalyzedResult>();
+
+  for (const result of primary) {
+    if (isValidAnalyzedResult(result)) byUrl.set(result.url, result);
+  }
+
+  for (const result of secondary) {
+    if (isValidAnalyzedResult(result)) byUrl.set(result.url, result);
+  }
+
+  return Array.from(byUrl.values());
+}
+
+async function fetchPageSummary(tabId: number | null): Promise<PageSummary> {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: "GET_PAGE_SUMMARY" }, (response: { ok?: boolean; domSignals?: DomSignals; totalLinks?: number; analyzedResults?: AnalyzedResult[] } | undefined) => {
+    chrome.runtime.sendMessage({ type: "GET_PAGE_SUMMARY", tabId }, (response: PageSummaryResponse | undefined) => {
       if (chrome.runtime.lastError || !response?.ok) {
         resolve({ domSignals: null, totalLinks: 0, analyzedResults: [] });
         return;
@@ -206,13 +311,61 @@ async function fetchPageSummary(): Promise<PageSummary> {
       resolve({
         domSignals: response.domSignals ?? null,
         totalLinks: response.totalLinks ?? 0,
-        analyzedResults: response.analyzedResults ?? [],
+        analyzedResults: (response.analyzedResults ?? []).filter(isValidAnalyzedResult),
       });
     });
   });
 }
 
+async function fetchCachedTabResults(tabId: number | null): Promise<AnalyzedResult[]> {
+  if (tabId === null) return [];
+
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: "GET_TAB_RESULTS", tabId }, (response: TabResultsResponse | undefined) => {
+      if (chrome.runtime.lastError || !response?.ok) {
+        resolve([]);
+        return;
+      }
+      resolve((response.results ?? []).filter(isValidAnalyzedResult));
+    });
+  });
+}
+
+async function fetchActiveTab(): Promise<chrome.tabs.Tab | null> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+      resolve(tabs[0] ?? null);
+    });
+  });
+}
+
+async function fetchUiState(): Promise<BubbleState> {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: "GET_UI_STATE" }, (response?: { ok?: boolean; state?: BubbleState }) => {
+      if (chrome.runtime.lastError) {
+        resolve("enabled");
+        return;
+      }
+
+      const state = response?.state;
+      if (state === "enabled" || state === "disabled" || state === "analyzing") {
+        resolve(state);
+        return;
+      }
+
+      resolve("enabled");
+    });
+  });
+}
+
 function renderDashboard(state: BubbleState, summary: PageSummary): void {
+  currentState = state;
+  currentSummary = summary;
+
   const items: LinkAnalysisItem[] = summary.analyzedResults.map((r) => ({
     url: r.url,
     rating: scoreToRating(r.score),
@@ -240,50 +393,42 @@ function renderDashboard(state: BubbleState, summary: PageSummary): void {
   renderSignals(summary.domSignals);
 }
 
-function renderForState(state: BubbleState): void {
-  void fetchPageSummary().then((summary) => {
-    const hasCachedAnalyzedLinks = summary.analyzedResults.length > 0;
-    const showAnalyzingView = state === "analyzing" && !hasCachedAnalyzedLinks;
+async function renderForState(state: BubbleState): Promise<void> {
+  const [pageSummary, cachedResults] = await Promise.all([
+    fetchPageSummary(currentTabId),
+    fetchCachedTabResults(currentTabId),
+  ]);
+  const summary: PageSummary = {
+    ...pageSummary,
+    analyzedResults: mergeAnalyzedResults(pageSummary.analyzedResults, cachedResults),
+  };
+  const hasCachedAnalyzedLinks = summary.analyzedResults.length > 0;
+  const showAnalyzingView = state === "analyzing" && !hasCachedAnalyzedLinks;
 
-    if (analyzingViewEl) analyzingViewEl.classList.toggle("is-hidden", !showAnalyzingView);
-    if (dashboardViewEl) dashboardViewEl.classList.toggle("is-hidden", showAnalyzingView);
+  setViewMode(showAnalyzingView);
 
-    if (showAnalyzingView) {
-      setAnalyzingTextAnimation();
-      return;
-    }
+  if (showAnalyzingView) {
+    setAnalyzingTextAnimation();
+    return;
+  }
 
-    renderDashboard(state, summary);
-  });
+  renderDashboard(state, summary);
 }
 
-function renderCurrentUrl(): void {
+function renderCurrentUrl(tab: chrome.tabs.Tab | null): void {
   if (!currentUrlEl) return;
 
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (chrome.runtime.lastError) {
-      currentUrlEl.textContent = "Unable to resolve current tab URL.";
-      return;
-    }
-
-    const url = tabs[0]?.url;
-    currentUrlEl.textContent = url || "Current tab URL unavailable.";
-  });
+  const url = tab?.url;
+  currentUrlEl.textContent = url || "Current tab URL unavailable.";
 }
 
-renderCurrentUrl();
+async function initializePopup(): Promise<void> {
+  const [tab, state] = await Promise.all([fetchActiveTab(), fetchUiState()]);
+  currentTabId = tab?.id ?? null;
+  currentState = state;
+  renderCurrentUrl(tab);
+  subscribeToLiveUpdates();
+  await renderForState(state);
+}
 
-chrome.runtime.sendMessage({ type: "GET_UI_STATE" }, (response?: { ok?: boolean; state?: BubbleState }) => {
-  if (chrome.runtime.lastError) {
-    renderForState("enabled");
-    return;
-  }
-
-  const state = response?.state;
-  if (state === "enabled" || state === "disabled" || state === "analyzing") {
-    renderForState(state);
-    return;
-  }
-
-  renderForState("enabled");
-});
+void initializePopup();
