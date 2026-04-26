@@ -107,6 +107,7 @@ class RequestInfo(TypedDict):
 
 class DownloadInfo(TypedDict):
     filename: str
+    url: str
     mime_type: str | None
 
 
@@ -146,6 +147,11 @@ class CaptureError(Exception):
     """Raised when the sandbox cannot produce any usable screenshot for a URL."""
 
 
+class _SkipExpectDownload(Exception):
+    """Sentinel raised inside ``page.expect_download`` to short-circuit its
+    blocking ``__aexit__`` once we've already inspected the future."""
+
+
 _playwright: Playwright | None = None
 _browser: Browser | None = None
 _browser_lock = asyncio.Lock()
@@ -164,6 +170,13 @@ async def _get_browser() -> Browser:
         _browser = await _playwright.chromium.launch(headless=True)
         logger.info("Playwright Chromium started")
     return _browser
+
+
+async def _silent_cancel(download: Download) -> None:
+    try:
+        await download.cancel()
+    except PlaywrightError:
+        pass
 
 
 async def shutdown_browser() -> None:
@@ -260,24 +273,21 @@ async def _capture_impl(
     def on_new_page(page: Page) -> None:
         new_tab_pages.append(page)
 
-    async def on_download(download: Download) -> None:
-        downloads.append(
-            DownloadInfo(filename=download.suggested_filename, mime_type=None)
-        )
-        try:
-            await download.cancel()
-        except PlaywrightError:
-            pass
-
     try:
         page = await context.new_page()
 
-        # Register popup/download listeners *after* opening the main page so
-        # the explicit context.new_page() above doesn't show up as a phantom
+        # Register popup listener *after* opening the main page so the
+        # explicit context.new_page() above doesn't show up as a phantom
         # "new_tab" popup. Real popups (window.open, target=_blank) fire
         # only after page activity begins below.
+        #
+        # NOTE on downloads: we deliberately do NOT use context.on("download",
+        # ...). In Playwright Python 1.58 that bare listener does not fire
+        # reliably for either navigation-initiated downloads (goto raises
+        # "Download is starting" before the event drains) or post-load
+        # downloads. page.expect_download() wrapping the navigation+settle
+        # window does work, so we use that pattern below.
         context.on("page", on_new_page)
-        context.on("download", on_download)
 
         def on_response(response: Response) -> None:
             response_urls.append(response.url)
@@ -306,34 +316,84 @@ async def _capture_impl(
         page.on("request", on_request)
         page.on("dialog", on_dialog)
 
-        try:
-            await page.goto(
-                url, wait_until="domcontentloaded", timeout=timeout_ms
-            )
-            if settle_ms > 0:
-                await page.wait_for_timeout(settle_ms)
-            screenshot_bytes = await page.screenshot(type="png", full_page=False)
-            screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
-            final_url = page.url
-            try:
-                page_title = await page.title()
-            except PlaywrightError:
-                page_title = ""
-            try:
-                raw_hrefs = await page.eval_on_selector_all(
-                    "a[href]", "els => els.map(e => e.href)"
-                )
-                if not isinstance(raw_hrefs, list):
-                    raw_hrefs = []
-            except PlaywrightError:
-                raw_hrefs = []
+        # Wrap navigation+settle in expect_download so any download
+        # triggered in that window is captured. page.expect_download is
+        # the only mechanism that reliably delivers download events in
+        # Playwright Python 1.58 — bare context.on("download", ...) does
+        # not fire for either navigation-initiated or click-triggered
+        # downloads in this version.
+        #
+        # AsyncEventContextManager.__aexit__ awaits the underlying future
+        # for the full timeout when no event arrives, which would add
+        # seconds of latency to every normal-page capture. We sidestep
+        # that by raising a sentinel inside the with-block: __aexit__
+        # cancels the future and returns immediately. We grab the
+        # result first via asyncio.shield so cancellation doesn't kill
+        # our read.
+        captured_download: Download | None = None
+        download_window_ms = timeout_ms + settle_ms + 1000
 
+        try:
+            async with page.expect_download(timeout=download_window_ms) as dl_info:
+                try:
+                    await page.goto(
+                        url, wait_until="domcontentloaded", timeout=timeout_ms
+                    )
+                    if settle_ms > 0:
+                        await page.wait_for_timeout(settle_ms)
+                    screenshot_bytes = await page.screenshot(
+                        type="png", full_page=False
+                    )
+                    screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
+                    final_url = page.url
+                    try:
+                        page_title = await page.title()
+                    except PlaywrightError:
+                        page_title = ""
+                    try:
+                        raw_hrefs = await page.eval_on_selector_all(
+                            "a[href]", "els => els.map(e => e.href)"
+                        )
+                        if not isinstance(raw_hrefs, list):
+                            raw_hrefs = []
+                    except PlaywrightError:
+                        raw_hrefs = []
+                except PlaywrightError as exc:
+                    # Direct binary URL: goto raises "Download is
+                    # starting" before the screenshot runs. That's a
+                    # successful detection — fall through to the future
+                    # check.
+                    if "Download is starting" not in str(exc):
+                        raise
+
+                try:
+                    captured_download = await asyncio.wait_for(
+                        asyncio.shield(dl_info.value), timeout=0.1
+                    )
+                except asyncio.TimeoutError:
+                    captured_download = None
+
+                # Sentinel raise: short-circuits __aexit__'s blocking
+                # await on the future. Caught immediately below.
+                raise _SkipExpectDownload()
+        except _SkipExpectDownload:
+            pass
         except PlaywrightTimeoutError as exc:
             error = f"timeout after {timeout_ms}ms: {exc}"
         except PlaywrightError as exc:
             error = f"playwright error: {exc}"
         except Exception as exc:  # noqa: BLE001
             error = f"{type(exc).__name__}: {exc}"
+
+        if captured_download is not None:
+            downloads.append(
+                DownloadInfo(
+                    filename=captured_download.suggested_filename,
+                    url=captured_download.url,
+                    mime_type=None,
+                )
+            )
+            asyncio.create_task(_silent_cancel(captured_download))
     finally:
         try:
             await context.close()
