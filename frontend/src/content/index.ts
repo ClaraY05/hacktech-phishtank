@@ -62,7 +62,8 @@ function extractTooltipText(entry: unknown): string | undefined {
 
   const riskScore = entry.risk_score;
   if (typeof riskScore === "number") {
-    return `Risk score: ${riskScore}`;
+    const normalizedScore = Math.max(0, Math.min(100, Math.round(riskScore)));
+    return `Risk score: ${normalizedScore}/100`;
   }
 
   return undefined;

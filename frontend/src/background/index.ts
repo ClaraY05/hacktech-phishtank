@@ -6,8 +6,10 @@ import type { BubbleState } from "../content/helper/uiConstants";
 
 const POPUP_WINDOW_WIDTH = 420;
 const POPUP_WINDOW_HEIGHT = 560;
+const BASE_ICON_PATH = "src/fih_icons/fih_icon.png";
 let popupWindowId: number | null = null;
 let latestUiState: BubbleState = "enabled";
+const baseIconCache = new Map<number, ImageData>();
 const TOOLBAR_STATE_COLORS: Record<BubbleState, string> = {
   analyzing: "#e8472f",
   enabled: "#0a8c7a",
@@ -38,14 +40,81 @@ function buildDotIconImageData(size: number, color: string): ImageData {
   return context.getImageData(0, 0, size, size);
 }
 
+async function getBaseIconImageData(size: number): Promise<ImageData | null> {
+  const cached = baseIconCache.get(size);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const response = await fetch(chrome.runtime.getURL(BASE_ICON_PATH));
+    if (!response.ok) {
+      return null;
+    }
+
+    const blob = await response.blob();
+    const bitmap = await createImageBitmap(blob);
+
+    const canvas = new OffscreenCanvas(size, size);
+    const context = canvas.getContext("2d");
+    if (!context) {
+      bitmap.close();
+      return null;
+    }
+
+    context.clearRect(0, 0, size, size);
+    context.drawImage(bitmap, 0, 0, size, size);
+    bitmap.close();
+
+    const imageData = context.getImageData(0, 0, size, size);
+    baseIconCache.set(size, imageData);
+    return imageData;
+  } catch (error) {
+    console.warn("PhishTank: failed to load base action icon", error);
+    return null;
+  }
+}
+
+async function buildStatusIconImageData(size: number, color: string): Promise<ImageData> {
+  const baseIcon = await getBaseIconImageData(size);
+  const canvas = new OffscreenCanvas(size, size);
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return buildDotIconImageData(size, color);
+  }
+
+  context.clearRect(0, 0, size, size);
+  if (baseIcon) {
+    context.putImageData(baseIcon, 0, 0);
+  }
+
+  const radius = size <= 16 ? 4 : 6;
+  const centerX = size - radius - 1;
+  const centerY = radius + 1;
+
+  context.beginPath();
+  context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  context.fillStyle = color;
+  context.fill();
+
+  context.lineWidth = 1.5;
+  context.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  context.stroke();
+  return context.getImageData(0, 0, size, size);
+}
+
 async function setToolbarStateDot(state: BubbleState): Promise<void> {
   latestUiState = state;
   const color = TOOLBAR_STATE_COLORS[state];
   await chrome.action.setBadgeText({ text: "" });
+  const [icon16, icon32] = await Promise.all([
+    buildStatusIconImageData(16, color),
+    buildStatusIconImageData(32, color),
+  ]);
   await chrome.action.setIcon({
     imageData: {
-      16: buildDotIconImageData(16, color),
-      32: buildDotIconImageData(32, color),
+      16: icon16,
+      32: icon32,
     },
   });
 }

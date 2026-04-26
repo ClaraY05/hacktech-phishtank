@@ -78,9 +78,13 @@ function getBucketCounts(items: LinkAnalysisItem[]): { red: number; yellow: numb
   let green = 0;
 
   items.forEach(({ rating }) => {
-    if (rating >= 1 && rating <= 3) red += 1;
-    else if (rating >= 4 && rating <= 7) yellow += 1;
-    else if (rating >= 8 && rating <= 10) green += 1;
+    if (rating >= 67) {
+      red += 1;
+    } else if (rating >= 34) {
+      yellow += 1;
+    } else {
+      green += 1;
+    }
   });
 
   return { red, yellow, green, total: items.length };
@@ -127,7 +131,8 @@ function renderTable(items: LinkAnalysisItem[]): void {
     linkTableEl.innerHTML = `
       <div class="item">
         <div class="item-row">
-          <span class="item-url mono">Hover links to see analysis</span>
+          <span class="item-url mono">No links available</span>
+          <span class="chip warn">0/10</span>
         </div>
       </div>
     `;
@@ -136,12 +141,12 @@ function renderTable(items: LinkAnalysisItem[]): void {
 
   linkTableEl.innerHTML = items
     .map((item) => {
-      const chipClass = item.rating <= 3 ? "danger" : item.rating <= 7 ? "warn" : "live";
+      const chipClass = item.rating >= 67 ? "danger" : item.rating >= 34 ? "warn" : "live";
       return `
         <div class="item">
           <div class="item-row">
             <span class="item-url mono" title="${item.url}">${item.url}</span>
-            <span class="chip ${chipClass}">${item.rating}/10</span>
+            <span class="chip ${chipClass}">${item.rating}/100</span>
           </div>
         </div>
       `;

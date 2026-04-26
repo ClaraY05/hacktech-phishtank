@@ -36,9 +36,9 @@ export function getPopupMarkup(): string {
                 <div id="safetyDonut" class="safety-donut" aria-label="Safety distribution donut"></div>
               </div>
               <div class="metrics">
-                <div class="metric"><div class="metric-label">Red (1-3)</div><div id="redCount" class="metric-value metric-red">0</div></div>
-                <div class="metric"><div class="metric-label">Yellow (4-7)</div><div id="yellowCount" class="metric-value metric-yellow">0</div></div>
-                <div class="metric"><div class="metric-label">Green (8-10)</div><div id="greenCount" class="metric-value metric-green">0</div></div>
+                <div class="metric"><div class="metric-label">Red (67-100)</div><div id="redCount" class="metric-value metric-red">0</div></div>
+                <div class="metric"><div class="metric-label">Yellow (34-66)</div><div id="yellowCount" class="metric-value metric-yellow">0</div></div>
+                <div class="metric"><div class="metric-label">Green (0-33)</div><div id="greenCount" class="metric-value metric-green">0</div></div>
                 <div class="metric"><div class="metric-label">Total</div><div id="totalCount" class="metric-value">0</div></div>
                 <div class="metric metric-wide"><div class="metric-label">Avg Score</div><div id="avgScore" class="metric-value">—</div></div>
               </div>
@@ -57,10 +57,10 @@ export function getPopupMarkup(): string {
         <div class="card">
           <div class="card-head">
             <div class="title"><span class="dot"></span> Compiled Links</div>
-            <span class="chip warn mono">rating/10</span>
+            <span class="chip warn mono">rating/100</span>
           </div>
           <div class="body">
-            <div class="table-head mono"><span>Link</span><span>Rating</span></div>
+            <div class="table-head mono"><span>Link</span><span>Risk Score</span></div>
             <div id="linkTable" class="list table-scroll"></div>
           </div>
         </div>

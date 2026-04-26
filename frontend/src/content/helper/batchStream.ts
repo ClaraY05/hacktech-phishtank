@@ -17,7 +17,7 @@ export type LinkAnalysisResult = {
 };
 
 export function scoreToRating(score: number): number {
-  return Math.max(1, Math.min(10, 10 - Math.round(score / 11)));
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 type IncomingMessage =

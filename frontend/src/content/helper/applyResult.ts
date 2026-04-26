@@ -14,8 +14,8 @@ export function riskClass(result: LinkAnalysisResult): string {
   if (result.risk === "MEDIUM") return RISK_MEDIUM;
   if (result.risk === "LOW") return RISK_LOW;
   const rating = scoreToRating(result.score);
-  if (rating <= 3) return RISK_HIGH;
-  if (rating <= 7) return RISK_MEDIUM;
+  if (rating >= 67) return RISK_HIGH;
+  if (rating >= 34) return RISK_MEDIUM;
   return RISK_LOW;
 }
 
