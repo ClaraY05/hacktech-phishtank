@@ -1,4 +1,6 @@
 # PhishTank Sandbox
+## 🏆 Winner of Best Use of Google Gemma 4 at Hacktech 2026
+Phishtank is an AI phishing detection extension made in 36 hours for Hacktech. Check out our project [here](https://devpost.com/software/phishtank-9jv6b0).
 
 This repository is split into two sections:
 
